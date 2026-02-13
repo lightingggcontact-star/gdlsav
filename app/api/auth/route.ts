@@ -34,27 +34,45 @@ export async function POST(request: Request) {
     }
 
     // User doesn't exist yet — create it (first use of this code)
-    const { error: signUpError } = await supabase.auth.signUp({
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password: code,
+      options: { emailRedirectTo: undefined },
     })
 
     if (signUpError) {
-      return NextResponse.json({ error: "Erreur de création de compte" }, { status: 500 })
+      console.error("SignUp error:", signUpError.message)
+      // If user already exists but unconfirmed, suggest fix
+      if (signUpError.message.includes("already registered")) {
+        return NextResponse.json({
+          error: "Compte en attente de confirmation. Désactivez 'Confirm email' dans Supabase Auth Settings.",
+        }, { status: 500 })
+      }
+      return NextResponse.json({ error: "Erreur serveur: " + signUpError.message }, { status: 500 })
     }
 
-    // Sign in after signup
+    // If signUp returned a session (email confirmation OFF), we're logged in
+    if (signUpData.session) {
+      return NextResponse.json({ success: true })
+    }
+
+    // signUp succeeded but no session = email confirmation is ON
+    // Try to sign in anyway (might work if auto-confirm is on)
     const { error: finalError } = await supabase.auth.signInWithPassword({
       email,
       password: code,
     })
 
     if (finalError) {
-      return NextResponse.json({ error: "Code incorrect" }, { status: 401 })
+      console.error("Post-signup signIn error:", finalError.message)
+      return NextResponse.json({
+        error: "Désactivez 'Confirm email' dans Supabase > Auth > Providers > Email",
+      }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
-  } catch {
+  } catch (err) {
+    console.error("Auth error:", err)
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })
   }
 }
