@@ -1255,170 +1255,175 @@ export default function MessagesPage() {
 
   const selectedTicket = allTickets.find(t => t.id === selectedTicketId)
 
-  /** Render a group of tickets from the same customer, stacked */
+  /** Render a group of tickets from the same customer */
   function TicketGroup({ tickets }: { tickets: GorgiasTicket[] }) {
     const first = tickets[0]
     const customerName = first.customer.name || first.customer.email.split("@")[0]
-    const anySelected = tickets.some(t => t.id === selectedTicketId)
+    const anyBulkSelected = tickets.some(t => selectedTicketIds.has(t.id))
+    const allBulkSelected = tickets.every(t => selectedTicketIds.has(t.id))
     const groupStatus = tickets.some(t => getTicketReadStatus(t) === "unread")
       ? "unread"
       : tickets.every(t => getTicketReadStatus(t) === "replied")
         ? "replied"
         : "read"
-    const anyBulkSelected = tickets.some(t => selectedTicketIds.has(t.id))
-    const allBulkSelected = tickets.every(t => selectedTicketIds.has(t.id))
-    const label = ticketLabels[String(first.id)] as TicketLabel | undefined
     const hasMultiple = tickets.length > 1
 
     return (
       <div className={cn(
-        "mx-2 my-1 rounded-xl transition-all group/row",
-        anySelected ? "bg-[#F3EAFA] ring-1 ring-[#6B2D8B]/20"
-          : anyBulkSelected ? "bg-[#F3EAFA]/40 ring-1 ring-[#6B2D8B]/10"
-          : "hover:bg-white/80",
-        groupStatus === "replied" && !anySelected && !anyBulkSelected && "opacity-50"
+        "transition-all",
+        groupStatus === "replied" && "opacity-50"
       )}>
-        {/* Customer header */}
-        <div className="flex items-center gap-2.5 px-3 pt-3 pb-1.5">
-          <div
-            className="relative shrink-0 cursor-pointer"
-            onClick={(e) => {
-              e.stopPropagation()
-              const ids = tickets.map(t => t.id)
-              setSelectedTicketIds(prev => {
-                const next = new Set(prev)
-                if (allBulkSelected) {
-                  ids.forEach(id => next.delete(id))
-                } else {
-                  ids.forEach(id => next.add(id))
-                }
-                return next
-              })
-            }}
-          >
-            <div className={cn(
-              "w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-semibold transition-all",
-              anyBulkSelected || allBulkSelected
-                ? "bg-[#6B2D8B] text-white scale-95"
-                : anySelected ? "bg-[#6B2D8B] text-white"
-                : "bg-gradient-to-br from-[#F0F0F0] to-[#E4E4E7] text-[#555] group-hover/row:from-[#E8E8EB] group-hover/row:to-[#DDDDE0]"
-            )}>
-              {anyBulkSelected || allBulkSelected ? (
-                <Check className="h-4 w-4" />
-              ) : (
-                getInitials(customerName)
-              )}
-            </div>
-            {groupStatus === "unread" && !anySelected && !anyBulkSelected && (
-              <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#6B2D8B] border-[2.5px] border-white shadow-sm" />
-            )}
-          </div>
+        {tickets.map((ticket, idx) => {
+          const isSelected = ticket.id === selectedTicketId
+          const lastDate = ticket.last_message_datetime || ticket.updated_datetime
+          const ticketStatus = getTicketReadStatus(ticket)
+          const ticketLabel = ticketLabels[String(ticket.id)] as TicketLabel | undefined
+          const isBulkSelected = selectedTicketIds.has(ticket.id)
+          const isFirst = idx === 0
+          const isLast = idx === tickets.length - 1
 
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className={cn(
-                "text-[13px] truncate",
-                anySelected ? "font-semibold text-[#6B2D8B]"
-                  : groupStatus === "unread" ? "font-semibold text-foreground"
-                  : "font-medium text-foreground"
-              )}>
-                {customerName}
-              </span>
-              {groupStatus === "replied" && (
-                <span className="text-[9px] font-medium text-[#047B5D] bg-[#ECFDF5] px-1.5 py-0.5 rounded-full shrink-0 flex items-center gap-0.5">
-                  <Check className="h-2.5 w-2.5" />
-                  Répondu
-                </span>
+          return (
+            <button
+              key={ticket.id}
+              onClick={() => handleSelectTicket(ticket)}
+              className={cn(
+                "w-full text-left px-3 py-2.5 transition-all flex items-start gap-3",
+                isSelected
+                  ? "bg-[#6B2D8B] text-white"
+                  : isBulkSelected
+                    ? "bg-[#F3EAFA]"
+                    : "hover:bg-white",
+                // Si multi-ticket, on colle les rows et on met une ligne fine entre elles
+                hasMultiple && !isFirst && "border-t border-[#E4E4E7]/60",
+                hasMultiple && !isLast && !isSelected && "pb-2",
               )}
-              {label === "urgent" && (
-                <span className="text-[9px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full shrink-0">
-                  <Flame className="h-2.5 w-2.5" />
-                </span>
-              )}
-              {label === "en_attente" && (
-                <span className="text-[9px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full shrink-0">
-                  <Clock className="h-2.5 w-2.5" />
-                </span>
-              )}
-            </div>
-            <span className="text-[11px] text-muted-foreground">
-              {first.customer.email}
-              {hasMultiple && <span className="ml-1.5 text-[10px] font-medium text-[#6B2D8B] bg-[#6B2D8B]/8 px-1.5 py-0.5 rounded-full">{tickets.length} tickets</span>}
-            </span>
-          </div>
-
-          <span className="text-[11px] text-muted-foreground shrink-0">
-            {timeAgo(first.last_message_datetime || first.updated_datetime)}
-          </span>
-        </div>
-
-        {/* Ticket rows */}
-        <div className={cn("px-2 pb-2", hasMultiple && "space-y-0.5")}>
-          {tickets.map((ticket, idx) => {
-            const isSelected = ticket.id === selectedTicketId
-            const lastDate = ticket.last_message_datetime || ticket.updated_datetime
-            const ticketStatus = getTicketReadStatus(ticket)
-            const ticketLabel = ticketLabels[String(ticket.id)] as TicketLabel | undefined
-
-            return (
-              <button
-                key={ticket.id}
-                onClick={() => handleSelectTicket(ticket)}
-                className={cn(
-                  "w-full text-left px-3 py-2 rounded-lg transition-all",
-                  isSelected
-                    ? "bg-[#6B2D8B]/10 ring-1 ring-[#6B2D8B]/20"
-                    : "hover:bg-black/[0.03]",
-                  hasMultiple && "ml-10"
-                )}
-                style={hasMultiple ? { width: "calc(100% - 2.5rem)" } : undefined}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    {hasMultiple && (
-                      <div className={cn(
-                        "w-1.5 h-1.5 rounded-full shrink-0",
-                        ticketStatus === "unread" ? "bg-[#6B2D8B]"
-                          : ticketStatus === "replied" ? "bg-[#047B5D]"
-                          : "bg-[#D4D4D8]"
-                      )} />
-                    )}
-                    <p className={cn(
-                      "text-[12px] truncate",
-                      isSelected ? "text-[#6B2D8B] font-medium"
-                        : ticketStatus === "unread" ? "text-foreground font-medium"
-                        : "text-muted-foreground"
-                    )}>
-                      {ticket.subject || "Sans objet"}
-                    </p>
-                    {q && ticket.status === "closed" && (
-                      <span className="text-[9px] font-medium text-muted-foreground bg-[#F0F0F0] px-1 py-0.5 rounded shrink-0">Fermé</span>
-                    )}
-                    {idx > 0 && ticketLabel === "urgent" && (
-                      <Flame className="h-2.5 w-2.5 text-red-500 shrink-0" />
-                    )}
-                    {idx > 0 && ticketLabel === "en_attente" && (
-                      <Clock className="h-2.5 w-2.5 text-amber-500 shrink-0" />
+            >
+              {/* Avatar — seulement sur le premier ticket du groupe */}
+              {isFirst ? (
+                <div
+                  className="relative shrink-0 cursor-pointer mt-0.5"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const ids = tickets.map(t => t.id)
+                    setSelectedTicketIds(prev => {
+                      const next = new Set(prev)
+                      if (allBulkSelected) ids.forEach(id => next.delete(id))
+                      else ids.forEach(id => next.add(id))
+                      return next
+                    })
+                  }}
+                >
+                  <div className={cn(
+                    "w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-bold transition-all",
+                    isSelected ? "bg-white/20 text-white"
+                      : isBulkSelected || anyBulkSelected ? "bg-[#6B2D8B] text-white"
+                      : ticketStatus === "unread" ? "bg-[#6B2D8B] text-white"
+                      : "bg-[#E9E9EB] text-[#555]"
+                  )}>
+                    {isBulkSelected || anyBulkSelected ? (
+                      <Check className="h-4 w-4" />
+                    ) : (
+                      getInitials(customerName)
                     )}
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {ticket.priority && (ticket.priority === "urgent" || ticket.priority === "high") && (
+                  {groupStatus === "unread" && !isSelected && !isBulkSelected && (
+                    <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#6B2D8B] border-2 border-[#F8F8FA]" />
+                  )}
+                </div>
+              ) : (
+                // Tickets suivants : pas d'avatar, juste un espace aligné
+                <div className="w-9 shrink-0 flex justify-center pt-1">
+                  <div className={cn("w-[3px] h-[3px] rounded-full", isSelected ? "bg-white/40" : "bg-[#D4D4D8]")} />
+                </div>
+              )}
+
+              {/* Contenu */}
+              <div className="flex-1 min-w-0">
+                {/* Ligne 1 : Nom + badges (uniquement premier ticket) */}
+                {isFirst && (
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className={cn(
+                      "text-[13px] font-semibold truncate",
+                      isSelected ? "text-white" : "text-foreground"
+                    )}>
+                      {customerName}
+                    </span>
+                    {hasMultiple && (
                       <span className={cn(
-                        "text-[9px] font-medium px-1.5 py-0.5 rounded-full",
-                        ticket.priority === "urgent" ? "bg-[#FEE8EB] text-[#C70A24]" : "bg-[#FFF5E1] text-[#8A6116]"
+                        "text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0",
+                        isSelected ? "bg-white/20 text-white" : "bg-[#6B2D8B]/10 text-[#6B2D8B]"
                       )}>
-                        {ticket.priority === "urgent" ? "Urgent" : "Haute"}
+                        {tickets.length}
                       </span>
                     )}
-                    {hasMultiple && (
-                      <span className="text-[10px] text-muted-foreground/60">{timeAgo(lastDate)}</span>
+                    {ticketLabel === "urgent" && (
+                      <Flame className={cn("h-3 w-3 shrink-0", isSelected ? "text-red-300" : "text-red-500")} />
+                    )}
+                    {ticketLabel === "en_attente" && (
+                      <Clock className={cn("h-3 w-3 shrink-0", isSelected ? "text-amber-300" : "text-amber-500")} />
+                    )}
+                    {groupStatus === "replied" && (
+                      <span className={cn(
+                        "text-[9px] font-medium px-1.5 py-0.5 rounded-full shrink-0 flex items-center gap-0.5",
+                        isSelected ? "bg-white/20 text-white" : "bg-[#ECFDF5] text-[#047B5D]"
+                      )}>
+                        <Check className="h-2.5 w-2.5" />
+                        Répondu
+                      </span>
                     )}
                   </div>
+                )}
+
+                {/* Ligne 2 : Sujet du ticket */}
+                <div className="flex items-center justify-between gap-2">
+                  <p className={cn(
+                    "text-[12px] truncate",
+                    isSelected ? "text-white/90 font-medium"
+                      : ticketStatus === "unread" ? "text-foreground font-medium"
+                      : "text-muted-foreground"
+                  )}>
+                    {ticket.subject || "Sans objet"}
+                  </p>
+                  {q && ticket.status === "closed" && (
+                    <span className="text-[9px] font-medium text-muted-foreground bg-[#F0F0F0] px-1 py-0.5 rounded shrink-0">Fermé</span>
+                  )}
                 </div>
-              </button>
-            )
-          })}
-        </div>
+
+                {/* Ligne 3 : Meta (messages count, priorité, date) */}
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className={cn(
+                    "text-[10px]",
+                    isSelected ? "text-white/50" : "text-muted-foreground/60"
+                  )}>
+                    #{ticket.id} · {ticket.messages_count} msg
+                  </span>
+                  {ticket.priority && (ticket.priority === "urgent" || ticket.priority === "high") && (
+                    <span className={cn(
+                      "text-[9px] font-semibold px-1.5 py-0.5 rounded-full",
+                      isSelected
+                        ? "bg-white/20 text-white"
+                        : ticket.priority === "urgent" ? "bg-[#FEE8EB] text-[#C70A24]" : "bg-[#FFF5E1] text-[#8A6116]"
+                    )}>
+                      {ticket.priority === "urgent" ? "Urgent" : "Haute"}
+                    </span>
+                  )}
+                  {!isFirst && ticketLabel === "urgent" && (
+                    <Flame className={cn("h-2.5 w-2.5 shrink-0", isSelected ? "text-red-300" : "text-red-500")} />
+                  )}
+                  {!isFirst && ticketLabel === "en_attente" && (
+                    <Clock className={cn("h-2.5 w-2.5 shrink-0", isSelected ? "text-amber-300" : "text-amber-500")} />
+                  )}
+                  <span className={cn(
+                    "text-[10px] ml-auto shrink-0",
+                    isSelected ? "text-white/50" : "text-muted-foreground/50"
+                  )}>
+                    {timeAgo(lastDate)}
+                  </span>
+                </div>
+              </div>
+            </button>
+          )
+        })}
       </div>
     )
   }
