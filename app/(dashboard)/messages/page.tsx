@@ -636,7 +636,7 @@ export default function MessagesPage() {
     setRefreshing(false)
   }
 
-  // ─── Weekly recap download ───
+  // ─── Weekly recap download (AI-powered) ───
 
   const [recapLoading, setRecapLoading] = useState(false)
 
@@ -655,87 +655,78 @@ export default function MessagesPage() {
         return
       }
 
-      const today = new Date().toLocaleDateString("fr-FR", {
-        day: "numeric", month: "long", year: "numeric",
-      })
-
-      const openCount = recentTickets.filter(t => t.status === "open").length
-      const closedCount = recentTickets.filter(t => t.status === "closed").length
-      const urgentCount = recentTickets.filter(t => {
-        const label = ticketLabels[String(t.id)]
-        return label === "urgent" || t.priority === "urgent"
-      }).length
-
-      let md = `# Récap Tickets SAV — Semaine du ${today}\n\n`
-      md += `**${recentTickets.length} tickets** | ${openCount} ouverts | ${closedCount} fermés`
-      if (urgentCount > 0) md += ` | ${urgentCount} urgents`
-      md += `\n\n---\n\n`
+      toast.info(`Analyse de ${recentTickets.length} tickets en cours...`)
 
       // Fetch messages for each ticket (in parallel, max 5 at a time)
-      const ticketDetails: Array<{ ticket: GorgiasTicket; messages: GorgiasMessage[] }> = []
+      const ticketsForRecap: Array<{
+        id: number; subject: string | null; status: string; priority: string | null
+        customerName: string; customerEmail: string; createdAt: string
+        tags: string[]; firstMessage: string; lastMessage: string; messageCount: number
+      }> = []
 
       for (let i = 0; i < recentTickets.length; i += 5) {
         const batch = recentTickets.slice(i, i + 5)
         const results = await Promise.all(
           batch.map(async (ticket) => {
+            let publicMsgs: GorgiasMessage[] = []
             try {
               const res = await fetch(`/api/gorgias/tickets/${ticket.id}/messages`)
               if (res.ok) {
                 const data = await res.json()
-                return { ticket, messages: (data.data || []) as GorgiasMessage[] }
+                publicMsgs = ((data.data || []) as GorgiasMessage[]).filter(m => m.public)
               }
             } catch { /* skip */ }
-            return { ticket, messages: [] as GorgiasMessage[] }
+
+            const firstMsg = publicMsgs[0]
+            const lastMsg = publicMsgs[publicMsgs.length - 1]
+
+            return {
+              id: ticket.id,
+              subject: ticket.subject,
+              status: ticket.status,
+              priority: ticket.priority,
+              customerName: ticket.customer.name || ticket.customer.email,
+              customerEmail: ticket.customer.email,
+              createdAt: new Date(ticket.created_datetime).toLocaleDateString("fr-FR"),
+              tags: ticket.tags.map(t => t.name),
+              firstMessage: firstMsg
+                ? stripQuotedContent(firstMsg.body_text || stripHtml(firstMsg.body_html || ""))
+                : "",
+              lastMessage: lastMsg
+                ? stripQuotedContent(lastMsg.body_text || stripHtml(lastMsg.body_html || ""))
+                : "",
+              messageCount: publicMsgs.length,
+            }
           })
         )
-        ticketDetails.push(...results)
+        ticketsForRecap.push(...results)
       }
 
-      for (const { ticket, messages: msgs } of ticketDetails) {
-        const publicMsgs = msgs.filter(m => m.public)
-        const created = new Date(ticket.created_datetime).toLocaleDateString("fr-FR", {
-          day: "numeric", month: "short", year: "numeric",
-        })
-        const label = ticketLabels[String(ticket.id)]
-        const labelStr = label === "urgent" ? " 🔴" : label === "en_attente" ? " 🟡" : ""
-        const statusStr = ticket.status === "open" ? "Ouvert" : "Fermé"
-        const tags = ticket.tags.length > 0 ? ` | Tags: ${ticket.tags.map(t => t.name).join(", ")}` : ""
+      // Call AI to generate the recap
+      const res = await fetch("/api/ai/ticket-recap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tickets: ticketsForRecap }),
+      })
 
-        md += `## Ticket #${ticket.id} — ${ticket.subject || "(sans objet)"}${labelStr}\n\n`
-        md += `- **Client** : ${ticket.customer.name || "?"} (${ticket.customer.email})\n`
-        md += `- **Statut** : ${statusStr} | Créé le ${created}${tags}\n`
-        md += `- **Messages** : ${publicMsgs.length}\n\n`
-
-        if (publicMsgs.length > 0) {
-          // Show first message (the problem) and last message
-          const first = publicMsgs[0]
-          const firstBody = stripQuotedContent(first.body_text || stripHtml(first.body_html || "")).trim()
-          const firstSender = first.from_agent ? "Agent" : "Client"
-          md += `**${firstSender}** : ${firstBody.slice(0, 500)}${firstBody.length > 500 ? "..." : ""}\n\n`
-
-          if (publicMsgs.length > 1) {
-            const last = publicMsgs[publicMsgs.length - 1]
-            const lastBody = stripQuotedContent(last.body_text || stripHtml(last.body_html || "")).trim()
-            const lastSender = last.from_agent ? "Agent" : "Client"
-            const lastDate = new Date(last.created_datetime).toLocaleDateString("fr-FR", {
-              day: "numeric", month: "short",
-            })
-            md += `**Dernier message (${lastDate}) — ${lastSender}** : ${lastBody.slice(0, 500)}${lastBody.length > 500 ? "..." : ""}\n\n`
-          }
-        }
-
-        md += `---\n\n`
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || "Erreur IA")
+        setRecapLoading(false)
+        return
       }
+
+      const { recap } = await res.json()
 
       // Download
-      const blob = new Blob([md], { type: "text/markdown;charset=utf-8" })
+      const blob = new Blob([recap], { type: "text/markdown;charset=utf-8" })
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
       a.download = `recap-sav-${new Date().toISOString().slice(0, 10)}.md`
       a.click()
       URL.revokeObjectURL(url)
-      toast.success(`Récap généré (${recentTickets.length} tickets)`)
+      toast.success(`Récap IA généré (${recentTickets.length} tickets analysés)`)
     } catch {
       toast.error("Erreur lors de la génération du récap")
     }
