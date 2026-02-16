@@ -46,7 +46,7 @@ const laPosteStatusBadge: Record<string, { label: string; className: string }> =
   delivered: { label: "Livré", className: "bg-[#CDFED4] text-[#047B5D] border-transparent" },
   in_transit: { label: "En cours", className: "bg-[#EAF4FF] text-[#005BD3] border-transparent" },
   problem: { label: "Problème", className: "bg-[#FFF1E3] text-[#E67C00] border-transparent" },
-  returned: { label: "Retour", className: "bg-[#F3E8FF] text-[#6B2D8B] border-transparent" },
+  returned: { label: "Retour", className: "bg-[#F3E8FF] text-[#007AFF] border-transparent" },
   unknown: { label: "—", className: "bg-secondary text-muted-foreground border-transparent" },
 }
 
@@ -56,14 +56,14 @@ function getInitials(name: string): string {
 
 function getAvatarStyle(name: string): React.CSSProperties {
   const palettes = [
-    { bg: "#E3D0FF", fg: "#6B2D8B" },
+    { bg: "#E3D0FF", fg: "#007AFF" },
     { bg: "#D0E8FF", fg: "#005BD3" },
     { bg: "#FFE0D0", fg: "#C4320A" },
     { bg: "#D0FFE0", fg: "#047B5D" },
     { bg: "#FFD0E8", fg: "#C70A24" },
     { bg: "#D0F0FF", fg: "#006D75" },
     { bg: "#FFF0D0", fg: "#8A6116" },
-    { bg: "#E8D0FF", fg: "#6B2D8B" },
+    { bg: "#E8D0FF", fg: "#007AFF" },
   ]
   let hash = 0
   for (const c of name) hash = c.charCodeAt(0) + ((hash << 5) - hash)

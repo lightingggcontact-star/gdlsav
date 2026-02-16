@@ -266,8 +266,8 @@ Ton code promo GDL`,
       <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-[#6B2D8B]/10 flex items-center justify-center">
-              <Mail className="h-4 w-4 text-[#6B2D8B]" />
+            <div className="h-8 w-8 rounded-lg bg-[#007AFF]/10 flex items-center justify-center">
+              <Mail className="h-4 w-4 text-[#007AFF]" />
             </div>
             Nouveau message
           </DialogTitle>
@@ -382,10 +382,10 @@ Ton code promo GDL`,
           )}
 
           {/* AI Assistant */}
-          <div className="rounded-lg border border-[#6B2D8B]/20 bg-[#F9F5FC] p-3 space-y-2">
+          <div className="rounded-lg border border-[#007AFF]/20 bg-[#F9F5FC] p-3 space-y-2">
             <div className="flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-[#6B2D8B]" />
-              <span className="text-[12px] font-medium text-[#6B2D8B]">Assistant IA</span>
+              <Sparkles className="h-3.5 w-3.5 text-[#007AFF]" />
+              <span className="text-[12px] font-medium text-[#007AFF]">Assistant IA</span>
               <span className="text-[11px] text-muted-foreground">— Décris la situation, je génère l'email</span>
             </div>
             <div className="flex gap-1.5">
@@ -401,13 +401,13 @@ Ton code promo GDL`,
                 }}
                 placeholder="Ex: Code promo anniversaire qui n'a pas marché, on s'excuse et on leur donne le code ANNIV10..."
                 rows={2}
-                className="flex-1 px-2.5 py-2 text-[12px] bg-white border border-[#6B2D8B]/15 rounded-md focus:border-[#6B2D8B]/40 focus:outline-none transition-colors resize-none placeholder:text-muted-foreground/50"
+                className="flex-1 px-2.5 py-2 text-[12px] bg-white border border-[#007AFF]/15 rounded-md focus:border-[#007AFF]/40 focus:outline-none transition-colors resize-none placeholder:text-muted-foreground/50"
                 disabled={aiGenerating || sending}
               />
               <button
                 onClick={handleAiGenerate}
                 disabled={!aiPrompt.trim() || aiGenerating || sending}
-                className="self-end h-9 px-3 rounded-md bg-[#6B2D8B] hover:bg-[#5a2576] text-white text-[11px] font-medium flex items-center gap-1.5 transition-colors disabled:opacity-40 shrink-0"
+                className="self-end h-9 px-3 rounded-md bg-[#007AFF] hover:bg-[#5a2576] text-white text-[11px] font-medium flex items-center gap-1.5 transition-colors disabled:opacity-40 shrink-0"
               >
                 {aiGenerating ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -452,7 +452,7 @@ Ton code promo GDL`,
               <div className="flex items-center justify-between text-[12px]">
                 <div className="flex items-center gap-1.5">
                   {sending ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-[#6B2D8B]" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-[#007AFF]" />
                   ) : progress.failed.length === 0 ? (
                     <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
                   ) : (
@@ -485,7 +485,7 @@ Ton code promo GDL`,
             <Button
               onClick={handleSend}
               disabled={!canSend}
-              className="bg-[#6B2D8B] hover:bg-[#5a2576] text-white"
+              className="bg-[#007AFF] hover:bg-[#5a2576] text-white"
             >
               {sending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-1.5" />

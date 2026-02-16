@@ -250,7 +250,7 @@ export default function FormsPage() {
             className={cn(
               "p-1.5 rounded-md transition-all",
               isPinnedForm
-                ? "text-gdl-purple bg-[#F0E5F7]"
+                ? "text-gdl-purple bg-[#EAF3FF]"
                 : "text-muted-foreground/30 hover:text-muted-foreground hover:bg-secondary opacity-0 group-hover:opacity-100"
             )}
           >
@@ -285,7 +285,7 @@ export default function FormsPage() {
           {/* Icon */}
           <div className={cn(
             "w-10 h-10 rounded-lg flex items-center justify-center mb-3",
-            form.isPublished ? "bg-[#F0E5F7] text-gdl-purple" : "bg-secondary text-muted-foreground"
+            form.isPublished ? "bg-[#EAF3FF] text-gdl-purple" : "bg-secondary text-muted-foreground"
           )}>
             <FileText className="h-5 w-5" />
           </div>

@@ -124,7 +124,7 @@ export function Sidebar() {
 
         <div className="px-5 pt-5 pb-1">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#6B2D8B] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-[#007AFF] flex items-center justify-center">
               <span className="text-white font-bold text-xs">GDL</span>
             </div>
             <div>
@@ -149,7 +149,7 @@ export function Sidebar() {
                 className={cn(
                   "flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors",
                   active
-                    ? "bg-[#F0E5F7] text-[#6B2D8B]"
+                    ? "bg-[#EAF3FF] text-[#007AFF]"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                 )}
               >
@@ -158,7 +158,7 @@ export function Sidebar() {
                 {badge > 0 && (
                   <span className={cn(
                     "min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-semibold flex items-center justify-center",
-                    item.badgeKey === "messages" ? "bg-[#6B2D8B]" : "bg-[#E51C00]"
+                    item.badgeKey === "messages" ? "bg-[#007AFF]" : "bg-[#E51C00]"
                   )}>
                     {badge}
                   </span>

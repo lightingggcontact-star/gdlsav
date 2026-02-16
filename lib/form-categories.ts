@@ -8,7 +8,7 @@ export interface FormCategory {
 }
 
 export const CATEGORY_COLORS = [
-  { value: "#6B2D8B", label: "Violet" },
+  { value: "#007AFF", label: "Violet" },
   { value: "#005BD3", label: "Bleu" },
   { value: "#047B5D", label: "Vert" },
   { value: "#E67C00", label: "Orange" },

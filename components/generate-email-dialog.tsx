@@ -101,8 +101,8 @@ export function GenerateEmailDialog({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-[#F0E5F7]">
-              <Sparkles className="h-4 w-4 text-[#6B2D8B]" />
+            <div className="p-1.5 rounded-md bg-[#EAF3FF]">
+              <Sparkles className="h-4 w-4 text-[#007AFF]" />
             </div>
             Générer un email de suivi
           </DialogTitle>
@@ -154,7 +154,7 @@ export function GenerateEmailDialog({
           <div className="flex justify-center py-4">
             <Button
               onClick={generateEmail}
-              className="gap-2 bg-[#6B2D8B] hover:bg-[#5a2574] text-white"
+              className="gap-2 bg-[#007AFF] hover:bg-[#005FCC] text-white"
             >
               <Sparkles className="h-4 w-4" />
               Générer l&apos;email avec Claude
@@ -164,7 +164,7 @@ export function GenerateEmailDialog({
 
         {loading && (
           <div className="flex flex-col items-center justify-center py-8 gap-3">
-            <Loader2 className="h-6 w-6 animate-spin text-[#6B2D8B]" />
+            <Loader2 className="h-6 w-6 animate-spin text-[#007AFF]" />
             <p className="text-sm text-muted-foreground">
               Claude rédige l&apos;email...
             </p>
@@ -196,7 +196,7 @@ export function GenerateEmailDialog({
                 type="text"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                className="w-full h-9 px-3 rounded-md border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-[#6B2D8B]/30 focus:border-[#6B2D8B]"
+                className="w-full h-9 px-3 rounded-md border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF]/30 focus:border-[#007AFF]"
               />
             </div>
 
@@ -238,7 +238,7 @@ export function GenerateEmailDialog({
               <Button
                 size="sm"
                 onClick={handleSendMail}
-                className="gap-1.5 bg-[#6B2D8B] hover:bg-[#5a2574] text-white"
+                className="gap-1.5 bg-[#007AFF] hover:bg-[#005FCC] text-white"
               >
                 <Mail className="h-3.5 w-3.5" />
                 Ouvrir dans Mail

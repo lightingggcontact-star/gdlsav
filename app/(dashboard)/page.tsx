@@ -116,7 +116,7 @@ function CategoryTag({ category }: { category: string }) {
     livraison: { bg: "#EAF4FF", text: "#005BD3" },
     qualité: { bg: "#FEE8EB", text: "#C70A24" },
     goût: { bg: "#FFF1E3", text: "#8A6116" },
-    emballage: { bg: "#F0E5F7", text: "#6B2D8B" },
+    emballage: { bg: "#EAF3FF", text: "#007AFF" },
     prix: { bg: "#FFF1E3", text: "#8A6116" },
     service: { bg: "#EAF4FF", text: "#005BD3" },
     autre: { bg: "#F1F1F1", text: "#616161" },
@@ -297,7 +297,7 @@ function TicketAnalysisSection() {
     <div className="rounded-lg border border-border bg-card shadow-[0_1px_0_0_rgba(0,0,0,.05)] overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border">
         <h2 className="text-[13px] font-semibold flex items-center gap-2">
-          <Mail className="h-4 w-4 text-[#6B2D8B]" />
+          <Mail className="h-4 w-4 text-[#007AFF]" />
           Analyse Messages
         </h2>
         <div className="flex items-center gap-2">
@@ -341,7 +341,7 @@ function TicketAnalysisSection() {
                 className={cn(
                   "px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors",
                   period === p
-                    ? "bg-[#6B2D8B] text-white"
+                    ? "bg-[#007AFF] text-white"
                     : "bg-[#F5F5F5] text-muted-foreground hover:bg-[#E9E9EB]"
                 )}
               >
@@ -372,7 +372,7 @@ function TicketAnalysisSection() {
             onClick={handleAnalyze}
             disabled={analyzing}
             size="sm"
-            className="bg-[#6B2D8B] text-white hover:bg-[#6B2D8B]/90 gap-2 h-8"
+            className="bg-[#007AFF] text-white hover:bg-[#007AFF]/90 gap-2 h-8"
           >
             {analyzing ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -419,8 +419,8 @@ function TicketAnalysisSection() {
 
         {!recap && !analyzing && (
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="w-10 h-10 rounded-full bg-[#F3EAFA] flex items-center justify-center mb-3">
-              <Mail className="h-5 w-5 text-[#6B2D8B]" />
+            <div className="w-10 h-10 rounded-full bg-[#EAF3FF] flex items-center justify-center mb-3">
+              <Mail className="h-5 w-5 text-[#007AFF]" />
             </div>
             <p className="text-sm font-medium">Analyse des tickets</p>
             <p className="text-xs text-muted-foreground mt-1">
@@ -856,7 +856,7 @@ export default function DashboardPage() {
                         submissionDate: review.submissionDate,
                         formName: review.formName,
                       })}
-                      className="p-1.5 rounded-md text-white bg-gdl-purple hover:bg-[#5a2574] transition-colors"
+                      className="p-1.5 rounded-md text-white bg-gdl-purple hover:bg-[#005FCC] transition-colors"
                       title="Générer email IA"
                     >
                       <Sparkles className="h-3.5 w-3.5" />
@@ -864,7 +864,7 @@ export default function DashboardPage() {
                     {review.email && (
                       <a
                         href={`mailto:${review.email}`}
-                        className="p-1.5 rounded-md text-muted-foreground hover:text-gdl-purple hover:bg-[#F0E5F7] transition-colors"
+                        className="p-1.5 rounded-md text-muted-foreground hover:text-gdl-purple hover:bg-[#EAF3FF] transition-colors"
                         title="Email direct"
                       >
                         <Mail className="h-3.5 w-3.5" />
@@ -939,7 +939,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="w-10 h-10 rounded-full bg-[#F0E5F7] flex items-center justify-center mb-3">
+              <div className="w-10 h-10 rounded-full bg-[#EAF3FF] flex items-center justify-center mb-3">
                 <Sparkles className="h-5 w-5 text-gdl-purple" />
               </div>
               <p className="text-sm font-medium">Résumé IA hebdomadaire</p>

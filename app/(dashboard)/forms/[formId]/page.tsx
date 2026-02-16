@@ -95,7 +95,7 @@ type Tab = "analytics" | "data"
 type SortDir = "asc" | "desc"
 
 const CHART_COLORS = [
-  "#6B2D8B", "#005BD3", "#047B5D", "#E67C00", "#C70A24",
+  "#007AFF", "#005BD3", "#047B5D", "#E67C00", "#C70A24",
   "#8B5CF6", "#0891B2", "#059669", "#D97706", "#DC2626",
   "#A855F7", "#06B6D4", "#10B981", "#F59E0B", "#EF4444",
 ]
@@ -493,7 +493,7 @@ export default function FormDetailPage() {
           {/* KPI cards — with satisfaction if available */}
           {kpis && (
             <div className={cn("grid gap-3", satisfactionKpi ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-2 lg:grid-cols-3")}>
-              <KpiCard icon={Users} label="Total réponses" value={kpis.total} color="#6B2D8B" />
+              <KpiCard icon={Users} label="Total réponses" value={kpis.total} color="#007AFF" />
               <KpiCard icon={TrendingUp} label="7 derniers jours" value={kpis.last7} color="#005BD3" />
               {satisfactionKpi ? (
                 <>
@@ -661,14 +661,14 @@ export default function FormDetailPage() {
                           feedback: cr.summary,
                           submissionDate: cr.date,
                         })}
-                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium bg-gdl-purple text-white hover:bg-[#5a2574] transition-colors"
+                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium bg-gdl-purple text-white hover:bg-[#005FCC] transition-colors"
                       >
                         <Sparkles className="h-3 w-3" /> Email IA
                       </button>
                       {cr.email && (
                         <a
                           href={`mailto:${cr.email}`}
-                          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium bg-[#F0E5F7] text-gdl-purple hover:bg-gdl-purple hover:text-white transition-colors"
+                          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium bg-[#EAF3FF] text-gdl-purple hover:bg-gdl-purple hover:text-white transition-colors"
                         >
                           <Mail className="h-3 w-3" /> Contacter
                         </a>
@@ -709,7 +709,7 @@ export default function FormDetailPage() {
                     contentStyle={{ backgroundColor: "#fff", border: "1px solid #E3E3E3", borderRadius: "8px", fontSize: "12px" }}
                     formatter={(v) => [`${v} réponses`, ""]}
                   />
-                  <Area type="monotone" dataKey="count" stroke="#6B2D8B" fill="#6B2D8B" fillOpacity={0.1} strokeWidth={2} />
+                  <Area type="monotone" dataKey="count" stroke="#007AFF" fill="#007AFF" fillOpacity={0.1} strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -986,7 +986,7 @@ export default function FormDetailPage() {
                                 submissionDate: sub.submissionTime,
                               })
                             }}
-                            className="p-1.5 rounded-md text-white bg-gdl-purple hover:bg-[#5a2574] transition-colors"
+                            className="p-1.5 rounded-md text-white bg-gdl-purple hover:bg-[#005FCC] transition-colors"
                             title="Générer email IA"
                           >
                             <Sparkles className="h-3.5 w-3.5" />
@@ -997,7 +997,7 @@ export default function FormDetailPage() {
                             <a
                               href={`mailto:${email}`}
                               onClick={(e) => e.stopPropagation()}
-                              className="p-1.5 rounded-md text-muted-foreground hover:text-gdl-purple hover:bg-[#F0E5F7] transition-colors"
+                              className="p-1.5 rounded-md text-muted-foreground hover:text-gdl-purple hover:bg-[#EAF3FF] transition-colors"
                               title="Envoyer email"
                             >
                               <Mail className="h-3.5 w-3.5" />
@@ -1101,7 +1101,7 @@ function SubmissionDetailPanel({ submission, open, onClose, onGenerateEmail }: {
       <SheetContent className="w-full sm:max-w-lg bg-card border-border overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[#F0E5F7] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-[#EAF3FF] flex items-center justify-center">
               <User className="h-4 w-4 text-gdl-purple" />
             </div>
             {displayName}
@@ -1136,7 +1136,7 @@ function SubmissionDetailPanel({ submission, open, onClose, onGenerateEmail }: {
               </div>
               <a
                 href={`mailto:${email}`}
-                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium bg-[#F0E5F7] text-gdl-purple hover:bg-gdl-purple hover:text-white transition-colors"
+                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium bg-[#EAF3FF] text-gdl-purple hover:bg-gdl-purple hover:text-white transition-colors"
               >
                 <Mail className="h-3 w-3" /> Email
               </a>

@@ -47,7 +47,7 @@
   --radius-4xl: calc(var(--radius) + 16px);
   /* GDL Brand */
   --color-gdl-yellow: #FFD200;
-  --color-gdl-purple: #6B2D8B;
+  --color-gdl-purple: #007AFF;
   --color-gdl-yellow-dim: #FFD20033;
 }
 
@@ -60,7 +60,7 @@
   --card-foreground: #303030;
   --popover: #FFFFFF;
   --popover-foreground: #303030;
-  --primary: #6B2D8B;
+  --primary: #007AFF;
   --primary-foreground: #FFFFFF;
   --secondary: #F6F6F7;
   --secondary-foreground: #303030;
@@ -71,8 +71,8 @@
   --destructive: #E51C00;
   --border: #E3E3E3;
   --input: #E3E3E3;
-  --ring: #6B2D8B;
-  --chart-1: #6B2D8B;
+  --ring: #007AFF;
+  --chart-1: #007AFF;
   --chart-2: #047B5D;
   --chart-3: #005BD3;
   --chart-4: #E67C00;
@@ -80,12 +80,12 @@
   /* Sidebar (light) */
   --sidebar: #FFFFFF;
   --sidebar-foreground: #303030;
-  --sidebar-primary: #6B2D8B;
+  --sidebar-primary: #007AFF;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #F0E5F7;
-  --sidebar-accent-foreground: #6B2D8B;
+  --sidebar-accent: #EAF3FF;
+  --sidebar-accent-foreground: #007AFF;
   --sidebar-border: #E3E3E3;
-  --sidebar-ring: #6B2D8B;
+  --sidebar-ring: #007AFF;
 }
 
 @layer base {

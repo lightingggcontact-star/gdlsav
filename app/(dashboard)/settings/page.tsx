@@ -280,8 +280,8 @@ export default function SettingsPage() {
       name: "Fillout",
       description: "Formulaires & données",
       icon: FileText,
-      iconColor: "text-[#6B2D8B]",
-      iconBg: "bg-[#F0E5F7]",
+      iconColor: "text-[#007AFF]",
+      iconBg: "bg-[#EAF3FF]",
       connected: health?.fillout,
     },
     {

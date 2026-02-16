@@ -46,7 +46,7 @@ const laPosteStatusConfig = {
   delivered: { label: "Livré", icon: CheckCircle2, className: "text-[#047B5D]", bg: "bg-[#CDFED4]" },
   in_transit: { label: "En transit", icon: Package, className: "text-[#005BD3]", bg: "bg-[#EAF4FF]" },
   problem: { label: "Problème en cours", icon: AlertTriangle, className: "text-[#E67C00]", bg: "bg-[#FFF1E3]" },
-  returned: { label: "Retour expéditeur", icon: RotateCcw, className: "text-[#6B2D8B]", bg: "bg-[#F3E8FF]" },
+  returned: { label: "Retour expéditeur", icon: RotateCcw, className: "text-[#007AFF]", bg: "bg-[#F3E8FF]" },
   unknown: { label: "Statut inconnu", icon: Circle, className: "text-muted-foreground", bg: "bg-secondary" },
 }
 
@@ -69,14 +69,14 @@ function getInitials(name: string): string {
 
 function getAvatarStyle(name: string): React.CSSProperties {
   const palettes = [
-    { bg: "#E3D0FF", fg: "#6B2D8B" },
+    { bg: "#E3D0FF", fg: "#007AFF" },
     { bg: "#D0E8FF", fg: "#005BD3" },
     { bg: "#FFE0D0", fg: "#C4320A" },
     { bg: "#D0FFE0", fg: "#047B5D" },
     { bg: "#FFD0E8", fg: "#C70A24" },
     { bg: "#D0F0FF", fg: "#006D75" },
     { bg: "#FFF0D0", fg: "#8A6116" },
-    { bg: "#E8D0FF", fg: "#6B2D8B" },
+    { bg: "#E8D0FF", fg: "#007AFF" },
   ]
   let hash = 0
   for (const c of name) hash = c.charCodeAt(0) + ((hash << 5) - hash)
