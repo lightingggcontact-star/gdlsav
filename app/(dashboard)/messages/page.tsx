@@ -30,6 +30,8 @@ import {
   MessageSquare,
   Phone,
   ArrowLeft,
+  FileDown,
+  ChevronUp,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -632,6 +634,112 @@ export default function MessagesPage() {
       if (selectedTicketId) await fetchMessages(selectedTicketId)
     }
     setRefreshing(false)
+  }
+
+  // ─── Weekly recap download ───
+
+  const [recapLoading, setRecapLoading] = useState(false)
+
+  async function downloadWeeklyRecap() {
+    setRecapLoading(true)
+    try {
+      const oneWeekAgo = new Date()
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+      const recentTickets = allTickets.filter(
+        (t) => new Date(t.updated_datetime) >= oneWeekAgo
+      )
+
+      if (recentTickets.length === 0) {
+        toast.info("Aucun ticket cette semaine")
+        setRecapLoading(false)
+        return
+      }
+
+      const today = new Date().toLocaleDateString("fr-FR", {
+        day: "numeric", month: "long", year: "numeric",
+      })
+
+      const openCount = recentTickets.filter(t => t.status === "open").length
+      const closedCount = recentTickets.filter(t => t.status === "closed").length
+      const urgentCount = recentTickets.filter(t => {
+        const label = ticketLabels[String(t.id)]
+        return label === "urgent" || t.priority === "urgent"
+      }).length
+
+      let md = `# Récap Tickets SAV — Semaine du ${today}\n\n`
+      md += `**${recentTickets.length} tickets** | ${openCount} ouverts | ${closedCount} fermés`
+      if (urgentCount > 0) md += ` | ${urgentCount} urgents`
+      md += `\n\n---\n\n`
+
+      // Fetch messages for each ticket (in parallel, max 5 at a time)
+      const ticketDetails: Array<{ ticket: GorgiasTicket; messages: GorgiasMessage[] }> = []
+
+      for (let i = 0; i < recentTickets.length; i += 5) {
+        const batch = recentTickets.slice(i, i + 5)
+        const results = await Promise.all(
+          batch.map(async (ticket) => {
+            try {
+              const res = await fetch(`/api/gorgias/tickets/${ticket.id}/messages`)
+              if (res.ok) {
+                const data = await res.json()
+                return { ticket, messages: (data.data || []) as GorgiasMessage[] }
+              }
+            } catch { /* skip */ }
+            return { ticket, messages: [] as GorgiasMessage[] }
+          })
+        )
+        ticketDetails.push(...results)
+      }
+
+      for (const { ticket, messages: msgs } of ticketDetails) {
+        const publicMsgs = msgs.filter(m => m.public)
+        const created = new Date(ticket.created_datetime).toLocaleDateString("fr-FR", {
+          day: "numeric", month: "short", year: "numeric",
+        })
+        const label = ticketLabels[String(ticket.id)]
+        const labelStr = label === "urgent" ? " 🔴" : label === "en_attente" ? " 🟡" : ""
+        const statusStr = ticket.status === "open" ? "Ouvert" : "Fermé"
+        const tags = ticket.tags.length > 0 ? ` | Tags: ${ticket.tags.map(t => t.name).join(", ")}` : ""
+
+        md += `## Ticket #${ticket.id} — ${ticket.subject || "(sans objet)"}${labelStr}\n\n`
+        md += `- **Client** : ${ticket.customer.name || "?"} (${ticket.customer.email})\n`
+        md += `- **Statut** : ${statusStr} | Créé le ${created}${tags}\n`
+        md += `- **Messages** : ${publicMsgs.length}\n\n`
+
+        if (publicMsgs.length > 0) {
+          // Show first message (the problem) and last message
+          const first = publicMsgs[0]
+          const firstBody = stripQuotedContent(first.body_text || stripHtml(first.body_html || "")).trim()
+          const firstSender = first.from_agent ? "Agent" : "Client"
+          md += `**${firstSender}** : ${firstBody.slice(0, 500)}${firstBody.length > 500 ? "..." : ""}\n\n`
+
+          if (publicMsgs.length > 1) {
+            const last = publicMsgs[publicMsgs.length - 1]
+            const lastBody = stripQuotedContent(last.body_text || stripHtml(last.body_html || "")).trim()
+            const lastSender = last.from_agent ? "Agent" : "Client"
+            const lastDate = new Date(last.created_datetime).toLocaleDateString("fr-FR", {
+              day: "numeric", month: "short",
+            })
+            md += `**Dernier message (${lastDate}) — ${lastSender}** : ${lastBody.slice(0, 500)}${lastBody.length > 500 ? "..." : ""}\n\n`
+          }
+        }
+
+        md += `---\n\n`
+      }
+
+      // Download
+      const blob = new Blob([md], { type: "text/markdown;charset=utf-8" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `recap-sav-${new Date().toISOString().slice(0, 10)}.md`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success(`Récap généré (${recentTickets.length} tickets)`)
+    } catch {
+      toast.error("Erreur lors de la génération du récap")
+    }
+    setRecapLoading(false)
   }
 
   // ─── SMS functions ───
@@ -1439,13 +1547,23 @@ export default function MessagesPage() {
               </div>
               <div className="flex items-center gap-0.5">
                 {sidebarMode === "tickets" && (
-                  <button
-                    onClick={() => setComposeOpen(true)}
-                    className="p-1.5 rounded-md text-muted-foreground hover:text-[#6B2D8B] hover:bg-[#F3EAFA] transition-colors"
-                    title="Nouveau message"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setComposeOpen(true)}
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-[#6B2D8B] hover:bg-[#F3EAFA] transition-colors"
+                      title="Nouveau message"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={downloadWeeklyRecap}
+                      disabled={recapLoading}
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-[#E67C00] hover:bg-[#FFF1E3] transition-colors"
+                      title="Récap de la semaine (.md)"
+                    >
+                      <FileDown className={cn("h-4 w-4", recapLoading && "animate-pulse")} />
+                    </button>
+                  </>
                 )}
                 <button
                   onClick={handleRefresh}
@@ -2540,8 +2658,8 @@ export default function MessagesPage() {
                   ) : null}
                 </div>
 
-                {/* Messages */}
-                <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+                {/* Messages — Email thread style */}
+                <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
                   {messagesLoading ? (
                     <div className="flex items-center justify-center py-16">
                       <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -2555,66 +2673,101 @@ export default function MessagesPage() {
                         const isAgent = msg.from_agent
                         const rawBody = msg.body_text || stripHtml(msg.body_html || "")
                         const body = stripQuotedContent(rawBody)
+                        const quotedPart = rawBody.slice(body.length).trim()
                         const msgDate = new Date(msg.created_datetime)
+                        const senderName = msg.sender?.name || msg.sender?.email || (isAgent ? "Agent" : "Client")
 
-                        // Only show images from attachments (not inline HTML)
                         const imageAttachments = (msg.attachments || [])
                           .filter(a => a.content_type?.startsWith("image/"))
 
-                        const prevMsg = idx > 0 ? publicMsgs[idx - 1] : null
-                        const prevDate = prevMsg ? new Date(prevMsg.created_datetime) : null
-                        const showDateSep = !prevDate || msgDate.toDateString() !== prevDate.toDateString()
+                        const dateStr = msgDate.toLocaleDateString("fr-FR", {
+                          weekday: "short", day: "numeric", month: "short",
+                          ...(msgDate.getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}),
+                        })
                         const timeStr = msgDate.toLocaleString("fr-FR", { hour: "2-digit", minute: "2-digit" })
-                        const sameSideAsPrev = prevMsg && prevMsg.from_agent === msg.from_agent
 
                         return (
-                          <div key={msg.id}>
-                            {showDateSep && (
-                              <div className="flex items-center justify-center py-4">
-                                <span className="text-[11px] font-medium text-muted-foreground/70 bg-[#F0F0F0] px-3 py-1 rounded-full">
-                                  {msgDate.toLocaleDateString("fr-FR", {
-                                    weekday: "short", day: "numeric", month: "long",
-                                    ...(msgDate.getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}),
-                                  })}
-                                </span>
-                              </div>
+                          <div
+                            key={msg.id}
+                            className={cn(
+                              "rounded-lg border overflow-hidden",
+                              isAgent
+                                ? "border-[#6B2D8B]/20 bg-[#FAF5FF]"
+                                : "border-border bg-white"
                             )}
+                          >
+                            {/* Email header */}
                             <div className={cn(
-                              "flex flex-col",
-                              isAgent ? "items-end" : "items-start",
-                              sameSideAsPrev ? "mt-1" : "mt-4",
+                              "flex items-center justify-between px-4 py-2.5 border-b",
+                              isAgent ? "border-[#6B2D8B]/10 bg-[#F3EAFA]" : "border-border/50 bg-[#FAFAFA]"
                             )}>
-                              <div className={cn(
-                                "max-w-[70%] rounded-2xl px-4 py-2.5 text-[13.5px] leading-[1.55]",
-                                isAgent
-                                  ? "bg-[#6B2D8B] text-white rounded-br-md"
-                                  : "bg-[#E9E9EB] text-[#1a1a1a] rounded-bl-md"
-                              )}>
-                                {body.split("\n").map((line, i) => (
-                                  <p key={i} className={line.trim() === "" ? "h-2.5" : ""}>
-                                    {line || "\u00A0"}
-                                  </p>
-                                ))}
-                                {imageAttachments.length > 0 && (
-                                  <div className={cn("flex flex-wrap gap-2", body.trim() && "mt-2")}>
-                                    {imageAttachments.map((att, i) => (
-                                      <button
-                                        key={i}
-                                        onClick={() => setPhotoLightbox(att.url)}
-                                        className="block rounded-lg overflow-hidden hover:opacity-80 transition-opacity"
-                                      >
-                                        <img
-                                          src={att.url}
-                                          alt={att.name || `Image ${i + 1}`}
-                                          className="max-w-[200px] max-h-[200px] rounded-lg object-cover"
-                                          loading="lazy"
-                                        />
-                                      </button>
-                                    ))}
-                                  </div>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className={cn(
+                                  "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0",
+                                  isAgent ? "bg-[#6B2D8B] text-white" : "bg-[#E9E9EB] text-[#666]"
+                                )}>
+                                  {senderName.charAt(0).toUpperCase()}
+                                </div>
+                                <span className={cn(
+                                  "text-[12px] font-semibold truncate",
+                                  isAgent ? "text-[#6B2D8B]" : "text-foreground"
+                                )}>
+                                  {senderName}
+                                </span>
+                                {isAgent && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#6B2D8B]/10 text-[#6B2D8B] font-medium shrink-0">
+                                    Agent
+                                  </span>
                                 )}
                               </div>
-                              <span className="text-[10px] text-muted-foreground/50 mt-1 px-1">{timeStr}</span>
+                              <span className="text-[11px] text-muted-foreground shrink-0 ml-2">
+                                {dateStr} {timeStr}
+                              </span>
+                            </div>
+
+                            {/* Email body */}
+                            <div className="px-4 py-3 text-[13px] leading-[1.6] text-foreground">
+                              {body.split("\n").map((line, i) => (
+                                <p key={i} className={line.trim() === "" ? "h-3" : ""}>
+                                  {line || "\u00A0"}
+                                </p>
+                              ))}
+
+                              {imageAttachments.length > 0 && (
+                                <div className={cn("flex flex-wrap gap-2", body.trim() && "mt-3")}>
+                                  {imageAttachments.map((att, i) => (
+                                    <button
+                                      key={i}
+                                      onClick={() => setPhotoLightbox(att.url)}
+                                      className="block rounded-lg overflow-hidden hover:opacity-80 transition-opacity"
+                                    >
+                                      <img
+                                        src={att.url}
+                                        alt={att.name || `Image ${i + 1}`}
+                                        className="max-w-[200px] max-h-[200px] rounded-lg object-cover"
+                                        loading="lazy"
+                                      />
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Quoted/previous email — collapsible */}
+                              {quotedPart && (
+                                <details className="mt-3 group">
+                                  <summary className="text-[11px] text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1 select-none">
+                                    <ChevronUp className="h-3 w-3 rotate-180 group-open:rotate-0 transition-transform" />
+                                    Voir le message précédent
+                                  </summary>
+                                  <div className="mt-2 pl-3 border-l-2 border-muted-foreground/20 text-[12px] text-muted-foreground leading-[1.5]">
+                                    {quotedPart.split("\n").map((line, i) => (
+                                      <p key={i} className={line.trim() === "" ? "h-2" : ""}>
+                                        {line || "\u00A0"}
+                                      </p>
+                                    ))}
+                                  </div>
+                                </details>
+                              )}
                             </div>
                           </div>
                         )
