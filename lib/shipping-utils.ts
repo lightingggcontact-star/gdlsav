@@ -1,6 +1,31 @@
 import type { ShopifyOrder, EnrichedOrder, ShippingThresholds } from "./types"
 
 /**
+ * Get the effective ship date considering:
+ * - Orders placed after 16:30 ship the next business day
+ * - Weekend days roll to Monday
+ */
+function getEffectiveShipDate(date: Date): Date {
+  const d = new Date(date)
+  const hours = d.getHours()
+  const minutes = d.getMinutes()
+
+  // After 16:30 → ships next day
+  if (hours > 16 || (hours === 16 && minutes >= 30)) {
+    d.setDate(d.getDate() + 1)
+  }
+
+  d.setHours(0, 0, 0, 0)
+
+  // If landed on Saturday → Monday
+  if (d.getDay() === 6) d.setDate(d.getDate() + 2)
+  // If landed on Sunday → Monday
+  if (d.getDay() === 0) d.setDate(d.getDate() + 1)
+
+  return d
+}
+
+/**
  * Calculate business days (Monday-Friday) between two dates.
  * Does not count holidays.
  */
@@ -62,7 +87,8 @@ export function enrichOrders(
   return orders.map((order) => {
     const fulfillment = order.fulfillments[0]
     const shippedAt = fulfillment?.createdAt ?? new Date().toISOString()
-    const businessDays = calculateBusinessDays(new Date(shippedAt), now)
+    const effectiveShipDate = getEffectiveShipDate(new Date(shippedAt))
+    const businessDays = calculateBusinessDays(effectiveShipDate, now)
     const shipmentStatus = fulfillment?.shipmentStatus ?? null
     const countryCode = order.shippingAddress.countryCode
 
