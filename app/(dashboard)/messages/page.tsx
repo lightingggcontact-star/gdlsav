@@ -1289,9 +1289,9 @@ export default function MessagesPage() {
               className={cn(
                 "w-full text-left px-3 py-2.5 transition-all flex items-start gap-3",
                 isSelected
-                  ? "bg-[#6B2D8B] text-white"
+                  ? "bg-[#18181B] text-white"
                   : isBulkSelected
-                    ? "bg-[#F3EAFA]"
+                    ? "bg-[#F4F4F5]"
                     : "hover:bg-white",
                 // Si multi-ticket, on colle les rows et on met une ligne fine entre elles
                 hasMultiple && !isFirst && "border-t border-[#E4E4E7]/60",
@@ -1316,8 +1316,8 @@ export default function MessagesPage() {
                   <div className={cn(
                     "w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-bold transition-all",
                     isSelected ? "bg-white/20 text-white"
-                      : isBulkSelected || anyBulkSelected ? "bg-[#6B2D8B] text-white"
-                      : ticketStatus === "unread" ? "bg-[#6B2D8B] text-white"
+                      : isBulkSelected || anyBulkSelected ? "bg-[#18181B] text-white"
+                      : ticketStatus === "unread" ? "bg-[#18181B] text-white"
                       : "bg-[#E9E9EB] text-[#555]"
                   )}>
                     {isBulkSelected || anyBulkSelected ? (
@@ -1327,7 +1327,7 @@ export default function MessagesPage() {
                     )}
                   </div>
                   {groupStatus === "unread" && !isSelected && !isBulkSelected && (
-                    <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#6B2D8B] border-2 border-[#F8F8FA]" />
+                    <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#18181B] border-2 border-[#F8F8FA]" />
                   )}
                 </div>
               ) : (
@@ -1351,7 +1351,7 @@ export default function MessagesPage() {
                     {hasMultiple && (
                       <span className={cn(
                         "text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0",
-                        isSelected ? "bg-white/20 text-white" : "bg-[#6B2D8B]/10 text-[#6B2D8B]"
+                        isSelected ? "bg-white/20 text-white" : "bg-[#18181B]/10 text-[#18181B]"
                       )}>
                         {tickets.length}
                       </span>
@@ -1440,14 +1440,14 @@ export default function MessagesPage() {
         className={cn(
           "w-full text-left px-4 py-3.5 transition-all",
           isSelected
-            ? "bg-[#F3EAFA] border-l-[3px] border-l-[#6B2D8B]"
+            ? "bg-[#F4F4F5] border-l-[3px] border-l-[#18181B]"
             : "hover:bg-[#FAFAFA] border-l-[3px] border-l-transparent"
         )}
       >
         <div className="flex items-start gap-3">
           <div className={cn(
             "w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-[11px] font-semibold mt-0.5",
-            isSelected ? "bg-[#6B2D8B] text-white" : "bg-[#F0F0F0] text-[#666]"
+            isSelected ? "bg-[#18181B] text-white" : "bg-[#F0F0F0] text-[#666]"
           )}>
             {getInitials(customerName)}
           </div>
@@ -1455,7 +1455,7 @@ export default function MessagesPage() {
             <div className="flex items-center justify-between gap-2">
               <span className={cn(
                 "text-[13px] truncate",
-                isSelected ? "font-semibold text-[#6B2D8B]" : "font-medium text-foreground"
+                isSelected ? "font-semibold text-[#18181B]" : "font-medium text-foreground"
               )}>
                 {customerName}
               </span>
@@ -1514,14 +1514,14 @@ export default function MessagesPage() {
                   className={cn(
                     "flex items-center gap-1.5 px-2.5 h-7 rounded-md text-[12px] font-medium transition-colors",
                     sidebarMode === "tickets"
-                      ? "bg-white text-[#6B2D8B] shadow-sm"
+                      ? "bg-white text-[#18181B] shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   <Mail className="h-3.5 w-3.5" />
                   Tickets
                   {openTickets.length > 0 && sidebarMode === "tickets" && (
-                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#6B2D8B] text-white text-[10px] font-semibold flex items-center justify-center">
+                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#18181B] text-white text-[10px] font-semibold flex items-center justify-center">
                       {openTickets.length}
                     </span>
                   )}
@@ -1544,7 +1544,7 @@ export default function MessagesPage() {
                   <>
                     <button
                       onClick={() => setComposeOpen(true)}
-                      className="p-1.5 rounded-md text-muted-foreground hover:text-[#6B2D8B] hover:bg-[#F3EAFA] transition-colors"
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-[#18181B] hover:bg-[#F4F4F5] transition-colors"
                       title="Nouveau message"
                     >
                       <Plus className="h-4 w-4" />
@@ -1599,14 +1599,14 @@ export default function MessagesPage() {
                   className={cn(
                     "flex-1 h-7 rounded-md text-[11px] font-medium transition-colors flex items-center justify-center gap-1",
                     activeTab === "all"
-                      ? "bg-[#6B2D8B]/10 text-[#6B2D8B]"
+                      ? "bg-[#18181B]/10 text-[#18181B]"
                       : "text-muted-foreground hover:bg-[#F0F0F0]"
                   )}
                 >
                   À traiter
                   <span className={cn(
                     "text-[10px] px-1 rounded-full",
-                    activeTab === "all" ? "bg-[#6B2D8B]/15" : "bg-[#F0F0F0]"
+                    activeTab === "all" ? "bg-[#18181B]/15" : "bg-[#F0F0F0]"
                   )}>{filteredOpen.length}</span>
                 </button>
                 <button
@@ -2007,7 +2007,7 @@ export default function MessagesPage() {
                       <div className="flex items-center gap-4 flex-wrap">
                         {/* Orders + total spent */}
                         <div className="flex items-center gap-1.5 text-[12px]">
-                          <ShoppingBag className="h-3.5 w-3.5 text-[#6B2D8B]" />
+                          <ShoppingBag className="h-3.5 w-3.5 text-[#18181B]" />
                           <span className="font-medium">{smsCustomer.customer.numberOfOrders}</span>
                           <span className="text-muted-foreground">commande{smsCustomer.customer.numberOfOrders > 1 ? "s" : ""}</span>
                           <span className="text-muted-foreground">· <span className="font-medium text-foreground">{parseFloat(smsCustomer.customer.totalSpent).toFixed(0)}€</span> dépensés</span>
@@ -2024,7 +2024,7 @@ export default function MessagesPage() {
                                 href={`https://admin.shopify.com/store/grainedelascars/orders/${adminId}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1.5 text-[12px] text-[#6B2D8B] hover:underline"
+                                className="flex items-center gap-1.5 text-[12px] text-[#18181B] hover:underline"
                               >
                                 <span className="font-medium">{last.name}</span>
                                 <span className="text-muted-foreground">
@@ -2050,7 +2050,7 @@ export default function MessagesPage() {
                                 <div className="flex items-center gap-1.5 text-[12px]">
                                   <Truck className="h-3.5 w-3.5 text-muted-foreground" />
                                   {last.trackingUrl ? (
-                                    <a href={last.trackingUrl} target="_blank" rel="noopener noreferrer" className="text-[#6B2D8B] hover:underline font-mono">
+                                    <a href={last.trackingUrl} target="_blank" rel="noopener noreferrer" className="text-[#18181B] hover:underline font-mono">
                                       {last.trackingNumber}
                                     </a>
                                   ) : (
@@ -2096,7 +2096,7 @@ export default function MessagesPage() {
                               href={`https://admin.shopify.com/store/grainedelascars/customers/${customerId}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-[12px] text-muted-foreground hover:text-[#6B2D8B] transition-colors"
+                              className="flex items-center gap-1 text-[12px] text-muted-foreground hover:text-[#18181B] transition-colors"
                               title="Voir client Shopify"
                             >
                               <ExternalLink className="h-3 w-3" />
@@ -2200,8 +2200,8 @@ export default function MessagesPage() {
               <>
                 {/* Ticket header */}
                 <div className="px-5 py-3.5 bg-white/80 backdrop-blur-sm border-b border-[#E4E4E7]/60 flex items-center gap-3 shrink-0">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#F3EAFA] to-[#E8D5F5] flex items-center justify-center shrink-0 shadow-sm">
-                    <span className="text-[12px] font-bold text-[#6B2D8B]">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#F4F4F5] to-[#E4E4E7] flex items-center justify-center shrink-0 shadow-sm">
+                    <span className="text-[12px] font-bold text-[#18181B]">
                       {getInitials(selectedTicket.customer.name || selectedTicket.customer.email)}
                     </span>
                   </div>
@@ -2225,8 +2225,8 @@ export default function MessagesPage() {
                       className={cn(
                         "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium transition-all",
                         aiChatOpen
-                          ? "bg-gradient-to-r from-[#6B2D8B]/10 to-[#7C3AED]/10 text-[#6B2D8B]"
-                          : "text-muted-foreground hover:text-[#6B2D8B] hover:bg-[#F3EAFA]"
+                          ? "bg-gradient-to-r from-[#18181B]/10 to-[#27272A]/10 text-[#18181B]"
+                          : "text-muted-foreground hover:text-[#18181B] hover:bg-[#F4F4F5]"
                       )}
                       title="Chat IA interne"
                     >
@@ -2265,7 +2265,7 @@ export default function MessagesPage() {
                   ) : customerOrders && customerOrders.orders.length > 0 ? (
                     <div className="flex items-center gap-4 flex-wrap">
                       <div className="flex items-center gap-1.5 text-[12px]">
-                        <ShoppingBag className="h-3.5 w-3.5 text-[#6B2D8B]" />
+                        <ShoppingBag className="h-3.5 w-3.5 text-[#18181B]" />
                         <span className="font-medium">{customerOrders.totalOrders}</span>
                         <span className="text-muted-foreground">commande{customerOrders.totalOrders > 1 ? "s" : ""}</span>
                         {customerOrders.totalSpent && (
@@ -2283,7 +2283,7 @@ export default function MessagesPage() {
                               href={`https://admin.shopify.com/store/grainedelascars/orders/${adminId}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center gap-1.5 text-[12px] text-[#6B2D8B] hover:underline"
+                              className="flex items-center gap-1.5 text-[12px] text-[#18181B] hover:underline"
                             >
                               <span className="font-medium">{last.name}</span>
                               <span className="text-muted-foreground">
@@ -2309,7 +2309,7 @@ export default function MessagesPage() {
                               <div className="flex items-center gap-1.5 text-[12px]">
                                 <Truck className="h-3.5 w-3.5 text-muted-foreground" />
                                 {last.trackingUrl ? (
-                                  <a href={last.trackingUrl} target="_blank" rel="noopener noreferrer" className="text-[#6B2D8B] hover:underline font-mono">
+                                  <a href={last.trackingUrl} target="_blank" rel="noopener noreferrer" className="text-[#18181B] hover:underline font-mono">
                                     {last.trackingNumber}
                                   </a>
                                 ) : (
@@ -2327,7 +2327,7 @@ export default function MessagesPage() {
                             {last.photoUrl && (
                               <button
                                 onClick={() => setPhotoLightbox(last.photoUrl)}
-                                className="flex items-center gap-1 text-[12px] text-[#6B2D8B] hover:text-[#5A2376] transition-colors"
+                                className="flex items-center gap-1 text-[12px] text-[#18181B] hover:text-[#09090B] transition-colors"
                                 title="Voir photo commande"
                               >
                                 <Camera className="h-3.5 w-3.5" />
@@ -2682,16 +2682,36 @@ export default function MessagesPage() {
                         })
                         const timeStr = msgDate.toLocaleString("fr-FR", { hour: "2-digit", minute: "2-digit" })
 
+                        // Previous message context
+                        const prevMsg = idx > 0 ? publicMsgs[idx - 1] : null
+                        const prevSender = prevMsg
+                          ? (prevMsg.sender?.name || prevMsg.sender?.email || (prevMsg.from_agent ? "Agent" : "Client"))
+                          : null
+                        const prevBody = prevMsg
+                          ? stripQuotedContent(prevMsg.body_text || stripHtml(prevMsg.body_html || "")).split("\n").filter(l => l.trim()).slice(0, 2).join(" ").slice(0, 120)
+                          : null
+
                         return (
                           <div key={msg.id} className="relative">
                             {/* Connector line between messages */}
                             {!isFirst && (
                               <div className="absolute -top-4 left-6 w-px h-4 bg-gradient-to-b from-transparent to-[#E4E4E7]" />
                             )}
+                            {/* Previous message preview */}
+                            {prevMsg && prevBody && (
+                              <div className="mb-1.5 ml-10 flex items-start gap-1.5 text-[11px] text-muted-foreground/50">
+                                <span className="shrink-0 font-medium text-muted-foreground/60">
+                                  {prevMsg.from_agent ? "↩" : "↪"} {prevSender} :
+                                </span>
+                                <span className="truncate italic">
+                                  {prevBody}{prevBody.length >= 120 ? "…" : ""}
+                                </span>
+                              </div>
+                            )}
                             <div className={cn(
                               "rounded-2xl overflow-hidden shadow-sm transition-all",
                               isAgent
-                                ? "bg-gradient-to-br from-[#FAF5FF] to-[#F3EAFA] border border-[#6B2D8B]/10"
+                                ? "bg-gradient-to-br from-[#FAFAFA] to-[#F4F4F5] border border-[#18181B]/10"
                                 : "bg-white border border-[#E4E4E7]/80"
                             )}>
                               {/* Header */}
@@ -2699,7 +2719,7 @@ export default function MessagesPage() {
                                 <div className={cn(
                                   "w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0",
                                   isAgent
-                                    ? "bg-gradient-to-br from-[#7C3AED] to-[#6B2D8B] text-white shadow-sm shadow-[#6B2D8B]/20"
+                                    ? "bg-gradient-to-br from-[#27272A] to-[#18181B] text-white shadow-sm shadow-[#18181B]/20"
                                     : "bg-gradient-to-br from-[#F0F0F0] to-[#E4E4E7] text-[#555]"
                                 )}>
                                   {senderName.charAt(0).toUpperCase()}
@@ -2708,12 +2728,12 @@ export default function MessagesPage() {
                                   <div className="flex items-center gap-1.5">
                                     <span className={cn(
                                       "text-[12px] font-semibold truncate",
-                                      isAgent ? "text-[#6B2D8B]" : "text-foreground"
+                                      isAgent ? "text-[#18181B]" : "text-foreground"
                                     )}>
                                       {senderName}
                                     </span>
                                     {isAgent && (
-                                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#6B2D8B] text-white font-medium shrink-0">
+                                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#18181B] text-white font-medium shrink-0">
                                         GDL
                                       </span>
                                     )}
@@ -2791,13 +2811,13 @@ export default function MessagesPage() {
                     value={replyText}
                     onChange={(e) => { setReplyText(e.target.value); setSendSuccess(false) }}
                     placeholder="Écris ta réponse ou génère-la avec l'IA..."
-                    className="min-h-[80px] text-[13px] bg-[#F8F8FA] border-[#E4E4E7] rounded-2xl resize-none focus:bg-white focus:border-[#6B2D8B]/30 focus:ring-1 focus:ring-[#6B2D8B]/10 transition-all placeholder:text-muted-foreground/40"
+                    className="min-h-[80px] text-[13px] bg-[#F8F8FA] border-[#E4E4E7] rounded-2xl resize-none focus:bg-white focus:border-[#18181B]/30 focus:ring-1 focus:ring-[#18181B]/10 transition-all placeholder:text-muted-foreground/40"
                   />
                   <div className="flex items-center gap-2 mt-3">
                     <button
                       onClick={handleGenerateReply}
                       disabled={generating || messages.length === 0}
-                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-medium bg-gradient-to-r from-[#6B2D8B]/10 to-[#7C3AED]/10 text-[#6B2D8B] hover:from-[#6B2D8B]/15 hover:to-[#7C3AED]/15 transition-all disabled:opacity-40"
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-medium bg-gradient-to-r from-[#18181B]/10 to-[#27272A]/10 text-[#18181B] hover:from-[#18181B]/15 hover:to-[#27272A]/15 transition-all disabled:opacity-40"
                     >
                       {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                       {generating ? "Génération..." : "IA"}
@@ -2815,7 +2835,7 @@ export default function MessagesPage() {
                     <button
                       onClick={handleSendReply}
                       disabled={sending || !replyText.trim()}
-                      className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-[12px] font-semibold bg-gradient-to-r from-[#6B2D8B] to-[#7C3AED] text-white shadow-md shadow-[#6B2D8B]/20 hover:shadow-lg hover:shadow-[#6B2D8B]/25 transition-all disabled:opacity-40 disabled:shadow-none"
+                      className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-[12px] font-semibold bg-gradient-to-r from-[#18181B] to-[#27272A] text-white shadow-md shadow-[#18181B]/20 hover:shadow-lg hover:shadow-[#18181B]/25 transition-all disabled:opacity-40 disabled:shadow-none"
                     >
                       {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                       Envoyer
@@ -2862,7 +2882,7 @@ export default function MessagesPage() {
                     <div className={cn(
                       "max-w-[90%] rounded-2xl px-3.5 py-2 text-[12.5px] leading-[1.5]",
                       msg.role === "user"
-                        ? "bg-[#6B2D8B] text-white rounded-br-md"
+                        ? "bg-[#18181B] text-white rounded-br-md"
                         : "bg-[#F5F5F5] text-[#1a1a1a] rounded-bl-md"
                     )}>
                       {msg.content.split("\n").map((line, i) => (
@@ -2898,7 +2918,7 @@ export default function MessagesPage() {
                   <button
                     onClick={handleAiChat}
                     disabled={aiChatLoading || !aiChatInput.trim()}
-                    className="h-9 w-9 rounded-lg bg-[#6B2D8B] hover:bg-[#5a2574] text-white flex items-center justify-center shrink-0 disabled:opacity-40 transition-colors"
+                    className="h-9 w-9 rounded-lg bg-[#18181B] hover:bg-[#09090B] text-white flex items-center justify-center shrink-0 disabled:opacity-40 transition-colors"
                   >
                     <Send className="h-3.5 w-3.5" />
                   </button>
