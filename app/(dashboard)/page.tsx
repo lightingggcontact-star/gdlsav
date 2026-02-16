@@ -190,6 +190,8 @@ function TicketAnalysisSection() {
 
   const [syncing, setSyncing] = useState(false)
   const [lastSync, setLastSync] = useState<string | null>(null)
+  const [learning, setLearning] = useState(false)
+  const [learnResult, setLearnResult] = useState<string | null>(null)
   const supabaseAnalysis = useSupabase()
 
   async function handleSync() {
@@ -202,6 +204,24 @@ function TicketAnalysisSection() {
       }
     } catch { /* silent */ }
     setSyncing(false)
+  }
+
+  async function handleLearn() {
+    setLearning(true)
+    setLearnResult(null)
+    try {
+      const res = await fetch("/api/ai/learn", { method: "POST" })
+      if (res.ok) {
+        const data = await res.json()
+        setLearnResult(`${data.patterns} patterns appris sur ${data.tickets_analyzed} tickets (${data.categories.join(", ")})`)
+      } else {
+        const err = await res.json()
+        setLearnResult(`Erreur : ${err.error}`)
+      }
+    } catch {
+      setLearnResult("Erreur de connexion.")
+    }
+    setLearning(false)
   }
 
   async function handleAnalyze() {
@@ -290,6 +310,16 @@ function TicketAnalysisSection() {
           >
             <RefreshCw className={cn("h-3.5 w-3.5", syncing && "animate-spin")} />
             {syncing ? "Sync..." : "Sync tickets"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleLearn}
+            disabled={learning || syncing}
+            className="gap-2 text-xs h-7 border-gdl-purple text-gdl-purple hover:bg-gdl-purple hover:text-white"
+          >
+            {learning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {learning ? "Apprentissage..." : "Apprendre"}
           </Button>
           {recap && (
             <Button variant="outline" size="sm" onClick={handleExport} className="gap-2 text-xs h-7">
@@ -398,6 +428,9 @@ function TicketAnalysisSection() {
             </p>
             {lastSync && (
               <p className="text-[10px] text-muted-foreground/60 mt-2">Dernière sync : {lastSync}</p>
+            )}
+            {learnResult && (
+              <p className="text-[10px] text-gdl-purple mt-1">{learnResult}</p>
             )}
           </div>
         )}

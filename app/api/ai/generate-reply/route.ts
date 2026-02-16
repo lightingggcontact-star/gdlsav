@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import Anthropic from "@anthropic-ai/sdk"
+import { createClient } from "@/lib/supabase/server"
 
 export const dynamic = "force-dynamic"
 
@@ -51,6 +52,24 @@ export async function POST(request: NextRequest) {
     const { customerName, ticketSubject, conversationHistory, customerOrders, joyPoints } = body
 
     const client = new Anthropic({ apiKey: key })
+
+    // Fetch learned patterns from knowledge base
+    let knowledgeContext = ""
+    try {
+      const supabase = await createClient()
+      const { data: patterns } = await supabase
+        .from("ai_knowledge")
+        .select("category, pattern, typical_response, key_info_needed, tone")
+        .order("frequency", { ascending: false })
+        .limit(15)
+
+      if (patterns && patterns.length > 0) {
+        const patternLines = patterns.map((p) =>
+          `• [${p.category}] ${p.pattern} → Réponse type : ${p.typical_response} (Ton: ${p.tone}, Infos nécessaires: ${p.key_info_needed})`
+        ).join("\n")
+        knowledgeContext = `\nPATTERNS APPRIS (basés sur tes conversations passées — utilise-les pour être cohérent) :\n${patternLines}\n`
+      }
+    } catch { /* knowledge base not available yet, continue without */ }
 
     // Detect if agent (Baba) already replied in this conversation
     const agentAlreadyReplied = conversationHistory.some(m => m.from_agent)
@@ -172,7 +191,8 @@ CE QUE TU NE DOIS JAMAIS FAIRE :
 - Dire "Je suis une IA"
 - Utiliser "N'hésitez pas" ou "Cordialement"
 - Faire une réponse trop longue
-- Resaluer un client à qui tu as DÉJÀ répondu dans la même conversation`,
+- Resaluer un client à qui tu as DÉJÀ répondu dans la même conversation
+${knowledgeContext}`,
       messages: [
         {
           role: "user",
