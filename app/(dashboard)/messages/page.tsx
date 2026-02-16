@@ -310,6 +310,7 @@ export default function MessagesPage() {
   const [activeTab, setActiveTab] = useState<"all" | "urgent" | "en_attente">("all")
   const [selectedTicketIds, setSelectedTicketIds] = useState<Set<number>>(new Set())
   const [bulkClosing, setBulkClosing] = useState(false)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null)
   const [messages, setMessages] = useState<GorgiasMessage[]>([])
@@ -1261,11 +1262,6 @@ export default function MessagesPage() {
     const customerName = first.customer.name || first.customer.email.split("@")[0]
     const anyBulkSelected = tickets.some(t => selectedTicketIds.has(t.id))
     const allBulkSelected = tickets.every(t => selectedTicketIds.has(t.id))
-    const groupStatus = tickets.some(t => getTicketReadStatus(t) === "unread")
-      ? "unread"
-      : tickets.every(t => getTicketReadStatus(t) === "replied")
-        ? "replied"
-        : "read"
     const hasMultiple = tickets.length > 1
 
     // Single ticket — flat row, no wrapper
@@ -1366,50 +1362,137 @@ export default function MessagesPage() {
     }
 
     // ── Multiple tickets from same customer ──
-    // Header bar with customer name, then each ticket as a full row inside a card
+    // Show first ticket like a normal row, with expand toggle for the rest
+    const groupKey = first.customer.email
+    const isExpanded = expandedGroups.has(groupKey)
+    const mainTicket = first
+    const extraTickets = tickets.slice(1)
+    const mainStatus = getTicketReadStatus(mainTicket)
+    const mainLabel = ticketLabels[String(mainTicket.id)] as TicketLabel | undefined
+    const mainSelected = mainTicket.id === selectedTicketId
+    const mainBulkSelected = selectedTicketIds.has(mainTicket.id)
+    const mainLastDate = mainTicket.last_message_datetime || mainTicket.updated_datetime
+
     return (
-      <div className="mx-2 my-1.5 rounded-2xl overflow-hidden bg-white/50 backdrop-blur-sm border border-black/[0.05] shadow-sm">
-        {/* Customer header */}
-        <div
-          className="px-3 py-2 flex items-center gap-2.5 cursor-pointer hover:bg-white/40 transition-colors"
-          onClick={() => {
-            const ids = tickets.map(t => t.id)
-            setSelectedTicketIds(prev => {
+      <div className="relative">
+        {/* Main ticket — looks like a normal ticket row */}
+        <button
+          onClick={() => handleSelectTicket(mainTicket)}
+          className={cn(
+            "w-full text-left px-3 py-2.5 transition-all flex items-start gap-3 border-l-[3px]",
+            mainSelected
+              ? "bg-[#007AFF] text-white border-l-[#007AFF]"
+              : mainBulkSelected
+                ? "bg-[#007AFF]/8 border-l-[#007AFF]"
+                : mainStatus === "unread"
+                  ? "bg-white/50 border-l-[#007AFF] hover:bg-white/70"
+                  : mainStatus === "replied"
+                    ? "border-l-[#34C759] opacity-50 hover:opacity-70"
+                    : "border-l-transparent hover:bg-white/60",
+          )}
+        >
+          <div
+            className="relative shrink-0 cursor-pointer mt-0.5"
+            onClick={(e) => {
+              e.stopPropagation()
+              const ids = tickets.map(t => t.id)
+              setSelectedTicketIds(prev => {
+                const next = new Set(prev)
+                if (allBulkSelected) ids.forEach(id => next.delete(id))
+                else ids.forEach(id => next.add(id))
+                return next
+              })
+            }}
+          >
+            <div className={cn(
+              "w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-bold transition-all",
+              mainSelected ? "bg-white/25 text-white"
+                : mainBulkSelected ? "bg-[#007AFF] text-white"
+                : mainStatus === "unread" ? "bg-[#007AFF] text-white"
+                : mainStatus === "replied" ? "bg-[#34C759] text-white"
+                : "bg-[#E5E5EA] text-[#8E8E93]"
+            )}>
+              {mainBulkSelected || anyBulkSelected ? <Check className="h-4 w-4" />
+                : mainStatus === "replied" ? <CheckCircle2 className="h-4 w-4" />
+                : getInitials(customerName)}
+            </div>
+            {mainStatus === "unread" && !mainSelected && !mainBulkSelected && (
+              <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#007AFF] border-2 border-[#F2F2F7]" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className={cn(
+                "text-[13px] truncate",
+                mainSelected ? "text-white font-semibold"
+                  : mainStatus === "unread" ? "text-foreground font-semibold"
+                  : mainStatus === "replied" ? "text-muted-foreground font-medium"
+                  : "text-foreground font-medium"
+              )}>{customerName}</span>
+              {mainLabel === "urgent" && <Flame className={cn("h-3 w-3 shrink-0", mainSelected ? "text-red-300" : "text-red-500")} />}
+              {mainLabel === "en_attente" && <Clock className={cn("h-3 w-3 shrink-0", mainSelected ? "text-amber-300" : "text-amber-500")} />}
+              {mainStatus === "replied" && !mainSelected && (
+                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full shrink-0 flex items-center gap-0.5 bg-[#34C759]/10 text-[#34C759]">
+                  <Check className="h-2.5 w-2.5" /> Répondu
+                </span>
+              )}
+            </div>
+            <p className={cn(
+              "text-[12px] truncate",
+              mainSelected ? "text-white/90 font-medium"
+                : mainStatus === "unread" ? "text-foreground font-medium"
+                : mainStatus === "replied" ? "text-muted-foreground/70"
+                : "text-muted-foreground"
+            )}>{mainTicket.subject || "Sans objet"}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className={cn("text-[10px]", mainSelected ? "text-white/50" : "text-muted-foreground/60")}>
+                #{mainTicket.id} · {mainTicket.messages_count} msg
+              </span>
+              {mainTicket.priority && (mainTicket.priority === "urgent" || mainTicket.priority === "high") && (
+                <span className={cn(
+                  "text-[9px] font-semibold px-1.5 py-0.5 rounded-full",
+                  mainSelected ? "bg-white/20 text-white"
+                    : mainTicket.priority === "urgent" ? "bg-[#FEE8EB] text-[#C70A24]" : "bg-[#FFF5E1] text-[#8A6116]"
+                )}>{mainTicket.priority === "urgent" ? "Urgent" : "Haute"}</span>
+              )}
+              <span className={cn("text-[10px] ml-auto shrink-0", mainSelected ? "text-white/50" : "text-muted-foreground/50")}>
+                {timeAgo(mainLastDate)}
+              </span>
+            </div>
+          </div>
+        </button>
+
+        {/* Expand toggle for extra tickets */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            setExpandedGroups(prev => {
               const next = new Set(prev)
-              if (allBulkSelected) ids.forEach(id => next.delete(id))
-              else ids.forEach(id => next.add(id))
+              if (next.has(groupKey)) next.delete(groupKey)
+              else next.add(groupKey)
               return next
             })
           }}
-        >
-          <div className={cn(
-            "w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold",
-            anyBulkSelected ? "bg-[#007AFF] text-white"
-              : groupStatus === "unread" ? "bg-[#007AFF] text-white"
-              : groupStatus === "replied" ? "bg-[#34C759] text-white"
-              : "bg-[#E5E5EA] text-[#8E8E93]"
-          )}>
-            {anyBulkSelected ? <Check className="h-3.5 w-3.5" /> : getInitials(customerName)}
-          </div>
-          <span className={cn(
-            "text-[13px] truncate flex-1",
-            groupStatus === "unread" ? "font-semibold text-foreground" : "font-medium text-foreground/80"
-          )}>{customerName}</span>
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#007AFF]/10 text-[#007AFF] shrink-0">
-            {tickets.length} tickets
-          </span>
-          {groupStatus === "unread" && (
-            <div className="w-2 h-2 rounded-full bg-[#007AFF] shrink-0" />
+          className={cn(
+            "w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium transition-colors",
+            "bg-[#F2F2F7]/60 hover:bg-[#F2F2F7] border-t border-black/[0.04]",
+            isExpanded ? "text-[#007AFF]" : "text-muted-foreground"
           )}
-          {groupStatus === "replied" && (
-            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full shrink-0 flex items-center gap-0.5 bg-[#34C759]/10 text-[#34C759]">
-              <Check className="h-2.5 w-2.5" />
+        >
+          <ChevronDown className={cn("h-3 w-3 transition-transform", isExpanded && "rotate-180")} />
+          <span>{extraTickets.length} autre{extraTickets.length > 1 ? "s" : ""} ticket{extraTickets.length > 1 ? "s" : ""}</span>
+          {!isExpanded && extraTickets.some(t => getTicketReadStatus(t) === "unread") && (
+            <div className="w-1.5 h-1.5 rounded-full bg-[#007AFF]" />
+          )}
+          {!isExpanded && extraTickets.some(t => getTicketReadStatus(t) === "replied") && !extraTickets.some(t => getTicketReadStatus(t) === "unread") && (
+            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full flex items-center gap-0.5 bg-[#34C759]/10 text-[#34C759]">
+              <Check className="h-2.5 w-2.5" /> Répondu
             </span>
           )}
-        </div>
+        </button>
 
-        {/* Individual tickets */}
-        {tickets.map((ticket) => {
+        {/* Extra tickets — collapsible */}
+        {isExpanded && extraTickets.map((ticket) => {
           const isSelected = ticket.id === selectedTicketId
           const lastDate = ticket.last_message_datetime || ticket.updated_datetime
           const ticketStatus = getTicketReadStatus(ticket)
@@ -1421,7 +1504,7 @@ export default function MessagesPage() {
               key={ticket.id}
               onClick={() => handleSelectTicket(ticket)}
               className={cn(
-                "w-full text-left px-3 py-2 transition-all flex items-center gap-2.5 border-t border-black/[0.05]",
+                "w-full text-left pl-6 pr-3 py-2 transition-all flex items-center gap-2.5 border-t border-black/[0.04] bg-[#F9F9FB]/50",
                 isSelected
                   ? "bg-[#007AFF] text-white"
                   : isBulkSelected
@@ -1433,7 +1516,7 @@ export default function MessagesPage() {
                         : "hover:bg-white/40",
               )}
             >
-              {/* Status indicator */}
+              {/* Status dot */}
               <div className={cn(
                 "w-2 h-2 rounded-full shrink-0",
                 isSelected ? "bg-white/50"
@@ -1453,6 +1536,11 @@ export default function MessagesPage() {
                   )}>
                     {ticket.subject || "Sans objet"}
                   </p>
+                  {ticketStatus === "replied" && !isSelected && (
+                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full shrink-0 flex items-center gap-0.5 bg-[#34C759]/10 text-[#34C759]">
+                      <Check className="h-2.5 w-2.5" /> Répondu
+                    </span>
+                  )}
                   <span className={cn("text-[10px] shrink-0", isSelected ? "text-white/50" : "text-muted-foreground/50")}>
                     {timeAgo(lastDate)}
                   </span>
@@ -1469,9 +1557,6 @@ export default function MessagesPage() {
                       isSelected ? "bg-white/20 text-white"
                         : ticket.priority === "urgent" ? "bg-[#FEE8EB] text-[#C70A24]" : "bg-[#FFF5E1] text-[#8A6116]"
                     )}>{ticket.priority === "urgent" ? "Urgent" : "Haute"}</span>
-                  )}
-                  {q && ticket.status === "closed" && (
-                    <span className="text-[9px] font-medium text-muted-foreground bg-[#F0F0F0] px-1 py-0.5 rounded shrink-0">Fermé</span>
                   )}
                 </div>
               </div>
