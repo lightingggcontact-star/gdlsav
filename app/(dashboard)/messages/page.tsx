@@ -1269,10 +1269,7 @@ export default function MessagesPage() {
     const hasMultiple = tickets.length > 1
 
     return (
-      <div className={cn(
-        "transition-all",
-        groupStatus === "replied" && "opacity-50"
-      )}>
+      <div className="transition-all">
         {tickets.map((ticket, idx) => {
           const isSelected = ticket.id === selectedTicketId
           const lastDate = ticket.last_message_datetime || ticket.updated_datetime
@@ -1287,13 +1284,16 @@ export default function MessagesPage() {
               key={ticket.id}
               onClick={() => handleSelectTicket(ticket)}
               className={cn(
-                "w-full text-left px-3 py-2.5 transition-all flex items-start gap-3",
+                "w-full text-left px-3 py-2.5 transition-all flex items-start gap-3 border-l-[3px]",
                 isSelected
-                  ? "bg-[#007AFF] text-white"
+                  ? "bg-[#007AFF] text-white border-l-[#007AFF]"
                   : isBulkSelected
-                    ? "bg-[#007AFF]/8"
-                    : "hover:bg-white/60",
-                // Si multi-ticket, on colle les rows et on met une ligne fine entre elles
+                    ? "bg-[#007AFF]/8 border-l-[#007AFF]"
+                    : ticketStatus === "unread"
+                      ? "bg-white/50 border-l-[#007AFF] hover:bg-white/70"
+                      : ticketStatus === "replied"
+                        ? "border-l-[#34C759] opacity-50 hover:opacity-70"
+                        : "border-l-transparent hover:bg-white/60",
                 hasMultiple && !isFirst && "border-t border-[#E4E4E7]/60",
                 hasMultiple && !isLast && !isSelected && "pb-2",
               )}
@@ -1318,10 +1318,13 @@ export default function MessagesPage() {
                     isSelected ? "bg-white/25 text-white"
                       : isBulkSelected || anyBulkSelected ? "bg-[#007AFF] text-white"
                       : ticketStatus === "unread" ? "bg-[#007AFF] text-white"
+                      : ticketStatus === "replied" ? "bg-[#34C759] text-white"
                       : "bg-[#E5E5EA] text-[#8E8E93]"
                   )}>
                     {isBulkSelected || anyBulkSelected ? (
                       <Check className="h-4 w-4" />
+                    ) : ticketStatus === "replied" ? (
+                      <CheckCircle2 className="h-4 w-4" />
                     ) : (
                       getInitials(customerName)
                     )}
@@ -1331,7 +1334,6 @@ export default function MessagesPage() {
                   )}
                 </div>
               ) : (
-                // Tickets suivants : pas d'avatar, juste un espace aligné
                 <div className="w-9 shrink-0 flex justify-center pt-1">
                   <div className={cn("w-[3px] h-[3px] rounded-full", isSelected ? "bg-white/40" : "bg-[#D4D4D8]")} />
                 </div>
@@ -1343,8 +1345,11 @@ export default function MessagesPage() {
                 {isFirst && (
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <span className={cn(
-                      "text-[13px] font-semibold truncate",
-                      isSelected ? "text-white" : "text-foreground"
+                      "text-[13px] truncate",
+                      isSelected ? "text-white font-semibold"
+                        : ticketStatus === "unread" ? "text-foreground font-semibold"
+                        : ticketStatus === "replied" ? "text-muted-foreground font-medium"
+                        : "text-foreground font-medium"
                     )}>
                       {customerName}
                     </span>
@@ -1362,11 +1367,8 @@ export default function MessagesPage() {
                     {ticketLabel === "en_attente" && (
                       <Clock className={cn("h-3 w-3 shrink-0", isSelected ? "text-amber-300" : "text-amber-500")} />
                     )}
-                    {groupStatus === "replied" && (
-                      <span className={cn(
-                        "text-[9px] font-medium px-1.5 py-0.5 rounded-full shrink-0 flex items-center gap-0.5",
-                        isSelected ? "bg-white/20 text-white" : "bg-[#ECFDF5] text-[#047B5D]"
-                      )}>
+                    {groupStatus === "replied" && !isSelected && (
+                      <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full shrink-0 flex items-center gap-0.5 bg-[#34C759]/10 text-[#34C759]">
                         <Check className="h-2.5 w-2.5" />
                         Répondu
                       </span>
@@ -1380,6 +1382,7 @@ export default function MessagesPage() {
                     "text-[12px] truncate",
                     isSelected ? "text-white/90 font-medium"
                       : ticketStatus === "unread" ? "text-foreground font-medium"
+                      : ticketStatus === "replied" ? "text-muted-foreground/70"
                       : "text-muted-foreground"
                   )}>
                     {ticket.subject || "Sans objet"}
