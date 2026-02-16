@@ -10,8 +10,6 @@ import {
   ExternalLink,
   Copy,
   CheckCircle2,
-  AlertCircle,
-  Inbox,
   ChevronDown,
   XCircle,
   Search,
@@ -1257,15 +1255,6 @@ export default function MessagesPage() {
 
   const selectedTicket = allTickets.find(t => t.id === selectedTicketId)
 
-  function toggleTicketSelection(ticketId: number) {
-    setSelectedTicketIds(prev => {
-      const next = new Set(prev)
-      if (next.has(ticketId)) next.delete(ticketId)
-      else next.add(ticketId)
-      return next
-    })
-  }
-
   /** Render a group of tickets from the same customer, stacked */
   function TicketGroup({ tickets }: { tickets: GorgiasTicket[] }) {
     const first = tickets[0]
@@ -1276,151 +1265,160 @@ export default function MessagesPage() {
       : tickets.every(t => getTicketReadStatus(t) === "replied")
         ? "replied"
         : "read"
-    // Check if any ticket in this group is bulk-selected
     const anyBulkSelected = tickets.some(t => selectedTicketIds.has(t.id))
     const allBulkSelected = tickets.every(t => selectedTicketIds.has(t.id))
-    // Label for first ticket
     const label = ticketLabels[String(first.id)] as TicketLabel | undefined
+    const hasMultiple = tickets.length > 1
 
     return (
       <div className={cn(
-        "border-l-[3px] transition-all group/row",
-        anySelected ? "border-l-[#6B2D8B] bg-[#F3EAFA]"
-          : anyBulkSelected ? "border-l-[#6B2D8B]/50 bg-[#F3EAFA]/30"
-          : "border-l-transparent",
+        "mx-2 my-1 rounded-xl transition-all group/row",
+        anySelected ? "bg-[#F3EAFA] ring-1 ring-[#6B2D8B]/20"
+          : anyBulkSelected ? "bg-[#F3EAFA]/40 ring-1 ring-[#6B2D8B]/10"
+          : "hover:bg-white/80",
         groupStatus === "replied" && !anySelected && !anyBulkSelected && "opacity-50"
       )}>
-        {tickets.map((ticket, idx) => {
-          const isSelected = ticket.id === selectedTicketId
-          const lastDate = ticket.last_message_datetime || ticket.updated_datetime
-          const isFirst = idx === 0
-          const ticketStatus = getTicketReadStatus(ticket)
-          const isBulkSelected = selectedTicketIds.has(ticket.id)
-
-          return (
-            <button
-              key={ticket.id}
-              onClick={() => handleSelectTicket(ticket)}
-              className={cn(
-                "w-full text-left px-4 transition-all",
-                isFirst ? "pt-3.5 pb-1.5" : "pt-1 pb-1.5",
-                !anySelected && !anyBulkSelected && "hover:bg-[#FAFAFA]",
-                isSelected && "bg-[#F3EAFA]/60"
+        {/* Customer header */}
+        <div className="flex items-center gap-2.5 px-3 pt-3 pb-1.5">
+          <div
+            className="relative shrink-0 cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation()
+              const ids = tickets.map(t => t.id)
+              setSelectedTicketIds(prev => {
+                const next = new Set(prev)
+                if (allBulkSelected) {
+                  ids.forEach(id => next.delete(id))
+                } else {
+                  ids.forEach(id => next.add(id))
+                }
+                return next
+              })
+            }}
+          >
+            <div className={cn(
+              "w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-semibold transition-all",
+              anyBulkSelected || allBulkSelected
+                ? "bg-[#6B2D8B] text-white scale-95"
+                : anySelected ? "bg-[#6B2D8B] text-white"
+                : "bg-gradient-to-br from-[#F0F0F0] to-[#E4E4E7] text-[#555] group-hover/row:from-[#E8E8EB] group-hover/row:to-[#DDDDE0]"
+            )}>
+              {anyBulkSelected || allBulkSelected ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                getInitials(customerName)
               )}
-            >
-              <div className="flex items-start gap-3">
-                {isFirst ? (
-                  <div
-                    className="relative shrink-0 cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      // Toggle all tickets in this group
-                      const ids = tickets.map(t => t.id)
-                      setSelectedTicketIds(prev => {
-                        const next = new Set(prev)
-                        if (allBulkSelected) {
-                          ids.forEach(id => next.delete(id))
-                        } else {
-                          ids.forEach(id => next.add(id))
-                        }
-                        return next
-                      })
-                    }}
-                  >
-                    <div className={cn(
-                      "w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold mt-0.5 transition-colors",
-                      isBulkSelected || anyBulkSelected
-                        ? "bg-[#6B2D8B] text-white"
-                        : anySelected ? "bg-[#6B2D8B] text-white"
-                        : "bg-[#F0F0F0] text-[#666] group-hover/row:bg-[#E0E0E0]"
-                    )}>
-                      {isBulkSelected || anyBulkSelected ? (
-                        <Check className="h-4 w-4" />
-                      ) : (
-                        getInitials(customerName)
-                      )}
-                    </div>
-                    {groupStatus === "unread" && !anySelected && !anyBulkSelected && (
-                      <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#6B2D8B] border-2 border-white" />
-                    )}
-                  </div>
-                ) : (
-                  <div className="w-8 shrink-0 flex justify-center">
-                    <div className="w-px h-full min-h-[16px] bg-border" />
-                  </div>
+            </div>
+            {groupStatus === "unread" && !anySelected && !anyBulkSelected && (
+              <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#6B2D8B] border-[2.5px] border-white shadow-sm" />
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className={cn(
+                "text-[13px] truncate",
+                anySelected ? "font-semibold text-[#6B2D8B]"
+                  : groupStatus === "unread" ? "font-semibold text-foreground"
+                  : "font-medium text-foreground"
+              )}>
+                {customerName}
+              </span>
+              {groupStatus === "replied" && (
+                <span className="text-[9px] font-medium text-[#047B5D] bg-[#ECFDF5] px-1.5 py-0.5 rounded-full shrink-0 flex items-center gap-0.5">
+                  <Check className="h-2.5 w-2.5" />
+                  Répondu
+                </span>
+              )}
+              {label === "urgent" && (
+                <span className="text-[9px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full shrink-0">
+                  <Flame className="h-2.5 w-2.5" />
+                </span>
+              )}
+              {label === "en_attente" && (
+                <span className="text-[9px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full shrink-0">
+                  <Clock className="h-2.5 w-2.5" />
+                </span>
+              )}
+            </div>
+            <span className="text-[11px] text-muted-foreground">
+              {first.customer.email}
+              {hasMultiple && <span className="ml-1.5 text-[10px] font-medium text-[#6B2D8B] bg-[#6B2D8B]/8 px-1.5 py-0.5 rounded-full">{tickets.length} tickets</span>}
+            </span>
+          </div>
+
+          <span className="text-[11px] text-muted-foreground shrink-0">
+            {timeAgo(first.last_message_datetime || first.updated_datetime)}
+          </span>
+        </div>
+
+        {/* Ticket rows */}
+        <div className={cn("px-2 pb-2", hasMultiple && "space-y-0.5")}>
+          {tickets.map((ticket, idx) => {
+            const isSelected = ticket.id === selectedTicketId
+            const lastDate = ticket.last_message_datetime || ticket.updated_datetime
+            const ticketStatus = getTicketReadStatus(ticket)
+            const ticketLabel = ticketLabels[String(ticket.id)] as TicketLabel | undefined
+
+            return (
+              <button
+                key={ticket.id}
+                onClick={() => handleSelectTicket(ticket)}
+                className={cn(
+                  "w-full text-left px-3 py-2 rounded-lg transition-all",
+                  isSelected
+                    ? "bg-[#6B2D8B]/10 ring-1 ring-[#6B2D8B]/20"
+                    : "hover:bg-black/[0.03]",
+                  hasMultiple && "ml-10"
                 )}
-                <div className="flex-1 min-w-0">
-                  {isFirst && (
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={cn(
-                          "text-[13px] truncate",
-                          anySelected ? "font-semibold text-[#6B2D8B]"
-                            : groupStatus === "unread" ? "font-semibold text-foreground"
-                            : "font-medium text-foreground"
-                        )}>
-                          {customerName}
-                        </span>
-                        {tickets.length > 1 && (
-                          <span className="text-[10px] font-medium text-muted-foreground bg-[#F0F0F0] px-1.5 py-0.5 rounded-full shrink-0">
-                            {tickets.length}
-                          </span>
-                        )}
-                        {groupStatus === "replied" && (
-                          <span className="text-[9px] font-medium text-[#047B5D] bg-[#ECFDF5] px-1.5 py-0.5 rounded-full shrink-0 flex items-center gap-0.5">
-                            <Check className="h-2.5 w-2.5" />
-                            Répondu
-                          </span>
-                        )}
-                        {label === "urgent" && (
-                          <span className="text-[9px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full shrink-0 flex items-center gap-0.5">
-                            <Flame className="h-2.5 w-2.5" />
-                          </span>
-                        )}
-                        {label === "en_attente" && (
-                          <span className="text-[9px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full shrink-0 flex items-center gap-0.5">
-                            <Clock className="h-2.5 w-2.5" />
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-[11px] text-muted-foreground shrink-0">{timeAgo(lastDate)}</span>
-                    </div>
-                  )}
-                  <div className={cn("flex items-center justify-between gap-2", !isFirst && "")}>
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <p className={cn(
-                        "text-[12px] truncate",
-                        isSelected ? "text-[#6B2D8B] font-medium"
-                          : ticketStatus === "unread" ? "text-foreground font-medium"
-                          : "text-muted-foreground",
-                        isFirst ? "mt-0.5" : ""
-                      )}>
-                        {ticket.subject || "Sans objet"}
-                      </p>
-                      {q && ticket.status === "closed" && (
-                        <span className="text-[9px] font-medium text-muted-foreground bg-[#F0F0F0] px-1 py-0.5 rounded shrink-0">
-                          Fermé
-                        </span>
-                      )}
-                    </div>
-                    {!isFirst && (
-                      <span className="text-[10px] text-muted-foreground/60 shrink-0">{timeAgo(lastDate)}</span>
+                style={hasMultiple ? { width: "calc(100% - 2.5rem)" } : undefined}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {hasMultiple && (
+                      <div className={cn(
+                        "w-1.5 h-1.5 rounded-full shrink-0",
+                        ticketStatus === "unread" ? "bg-[#6B2D8B]"
+                          : ticketStatus === "replied" ? "bg-[#047B5D]"
+                          : "bg-[#D4D4D8]"
+                      )} />
+                    )}
+                    <p className={cn(
+                      "text-[12px] truncate",
+                      isSelected ? "text-[#6B2D8B] font-medium"
+                        : ticketStatus === "unread" ? "text-foreground font-medium"
+                        : "text-muted-foreground"
+                    )}>
+                      {ticket.subject || "Sans objet"}
+                    </p>
+                    {q && ticket.status === "closed" && (
+                      <span className="text-[9px] font-medium text-muted-foreground bg-[#F0F0F0] px-1 py-0.5 rounded shrink-0">Fermé</span>
+                    )}
+                    {idx > 0 && ticketLabel === "urgent" && (
+                      <Flame className="h-2.5 w-2.5 text-red-500 shrink-0" />
+                    )}
+                    {idx > 0 && ticketLabel === "en_attente" && (
+                      <Clock className="h-2.5 w-2.5 text-amber-500 shrink-0" />
                     )}
                   </div>
-                  {ticket.priority && (ticket.priority === "urgent" || ticket.priority === "high") && (
-                    <span className={cn(
-                      "inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mt-1",
-                      ticket.priority === "urgent" ? "bg-[#FEE8EB] text-[#C70A24]" : "bg-[#FFF5E1] text-[#8A6116]"
-                    )}>
-                      {ticket.priority === "urgent" ? "Urgent" : "Priorité haute"}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {ticket.priority && (ticket.priority === "urgent" || ticket.priority === "high") && (
+                      <span className={cn(
+                        "text-[9px] font-medium px-1.5 py-0.5 rounded-full",
+                        ticket.priority === "urgent" ? "bg-[#FEE8EB] text-[#C70A24]" : "bg-[#FFF5E1] text-[#8A6116]"
+                      )}>
+                        {ticket.priority === "urgent" ? "Urgent" : "Haute"}
+                      </span>
+                    )}
+                    {hasMultiple && (
+                      <span className="text-[10px] text-muted-foreground/60">{timeAgo(lastDate)}</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </button>
-          )
-        })}
-        <div className="h-1" />
+              </button>
+            )
+          })}
+        </div>
       </div>
     )
   }
@@ -1501,7 +1499,7 @@ export default function MessagesPage() {
       <div className="flex flex-1 min-h-0 gap-0">
 
         {/* ═══ LEFT: Ticket list ═══ */}
-        <div className="w-[300px] shrink-0 flex flex-col border-r border-border bg-white">
+        <div className="w-[320px] shrink-0 flex flex-col border-r border-[#E4E4E7]/80 bg-[#F8F8FA]">
           <div className="px-4 py-3 border-b border-border space-y-2.5">
             {/* Mode toggle: Tickets / SMS */}
             <div className="flex items-center justify-between">
@@ -1932,7 +1930,7 @@ export default function MessagesPage() {
 
         {/* ═══ RIGHT: Conversation ═══ */}
         <div className="flex-1 flex min-w-0">
-          <div className="flex-1 flex flex-col bg-[#FAFAFA] min-w-0">
+          <div className="flex-1 flex flex-col bg-gradient-to-b from-[#FAFAFA] to-[#F4F4F5] min-w-0">
             {/* ── SMS Thread View ── */}
             {sidebarMode === "sms" ? (
               !selectedSmsConversation && !smsNewNumber && selectedSmsPhone === null ? (
@@ -2181,11 +2179,11 @@ export default function MessagesPage() {
             ) : !selectedTicket ? (
               <div className="flex-1 flex items-center justify-center text-center">
                 <div>
-                  <div className="w-16 h-16 rounded-2xl bg-white border border-border flex items-center justify-center mx-auto mb-4 shadow-sm">
-                    <Mail className="h-7 w-7 text-muted-foreground/40" />
+                  <div className="w-16 h-16 rounded-3xl bg-white/80 backdrop-blur border border-[#E4E4E7]/60 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-black/[0.03]">
+                    <Mail className="h-7 w-7 text-muted-foreground/30" />
                   </div>
-                  <p className="text-sm font-medium text-muted-foreground">Sélectionne un ticket</p>
-                  <p className="text-[12px] text-muted-foreground/60 mt-1">
+                  <p className="text-[14px] font-medium text-muted-foreground/80">Sélectionne un ticket</p>
+                  <p className="text-[12px] text-muted-foreground/40 mt-1">
                     {openTickets.length > 0
                       ? `${openTickets.length} ticket${openTickets.length > 1 ? "s" : ""} à traiter`
                       : "Aucun ticket ouvert"
@@ -2196,9 +2194,9 @@ export default function MessagesPage() {
             ) : (
               <>
                 {/* Ticket header */}
-                <div className="px-4 py-3 bg-white border-b border-border flex items-center gap-3 shrink-0">
-                  <div className="w-9 h-9 rounded-full bg-[#F3EAFA] flex items-center justify-center shrink-0">
-                    <span className="text-[11px] font-semibold text-[#6B2D8B]">
+                <div className="px-5 py-3.5 bg-white/80 backdrop-blur-sm border-b border-[#E4E4E7]/60 flex items-center gap-3 shrink-0">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#F3EAFA] to-[#E8D5F5] flex items-center justify-center shrink-0 shadow-sm">
+                    <span className="text-[12px] font-bold text-[#6B2D8B]">
                       {getInitials(selectedTicket.customer.name || selectedTicket.customer.email)}
                     </span>
                   </div>
@@ -2207,21 +2205,22 @@ export default function MessagesPage() {
                       <span className="text-[14px] font-semibold truncate">
                         {selectedTicket.customer.name || selectedTicket.customer.email}
                       </span>
-                      <span className="text-[12px] text-muted-foreground hidden sm:inline">
+                      <span className="text-[11px] text-muted-foreground/60 hidden sm:inline">
                         {selectedTicket.customer.email}
                       </span>
                     </div>
-                    <p className="text-[12px] text-muted-foreground truncate">
+                    <p className="text-[12px] text-muted-foreground truncate mt-0.5">
                       {selectedTicket.subject || "Sans objet"}
+                      <span className="text-muted-foreground/40 ml-1.5">#{selectedTicket.id}</span>
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => setAiChatOpen(v => !v)}
                       className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors",
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium transition-all",
                         aiChatOpen
-                          ? "bg-[#F3EAFA] text-[#6B2D8B]"
+                          ? "bg-gradient-to-r from-[#6B2D8B]/10 to-[#7C3AED]/10 text-[#6B2D8B]"
                           : "text-muted-foreground hover:text-[#6B2D8B] hover:bg-[#F3EAFA]"
                       )}
                       title="Chat IA interne"
@@ -2233,7 +2232,7 @@ export default function MessagesPage() {
                       <button
                         onClick={handleCloseTicket}
                         disabled={closing}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-muted-foreground hover:text-[#C70A24] hover:bg-[#FEE8EB] transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium text-muted-foreground hover:text-[#C70A24] hover:bg-[#FEE8EB] transition-colors"
                       >
                         {closing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
                         Fermer
@@ -2243,7 +2242,7 @@ export default function MessagesPage() {
                       href={`https://grainedelascars.gorgias.com/app/ticket/${selectedTicket.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-[#F0F0F0] transition-colors"
+                      className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-black/[0.04] transition-colors"
                     >
                       <ExternalLink className="h-4 w-4" />
                     </a>
@@ -2649,8 +2648,8 @@ export default function MessagesPage() {
                   ) : null}
                 </div>
 
-                {/* Messages — Email thread style */}
-                <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+                {/* Messages — Glass thread */}
+                <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
                   {messagesLoading ? (
                     <div className="flex items-center justify-center py-16">
                       <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -2667,6 +2666,7 @@ export default function MessagesPage() {
                         const quotedPart = rawBody.slice(body.length).trim()
                         const msgDate = new Date(msg.created_datetime)
                         const senderName = msg.sender?.name || msg.sender?.email || (isAgent ? "Agent" : "Client")
+                        const isFirst = idx === 0
 
                         const imageAttachments = (msg.attachments || [])
                           .filter(a => a.content_type?.startsWith("image/"))
@@ -2678,87 +2678,93 @@ export default function MessagesPage() {
                         const timeStr = msgDate.toLocaleString("fr-FR", { hour: "2-digit", minute: "2-digit" })
 
                         return (
-                          <div
-                            key={msg.id}
-                            className={cn(
-                              "rounded-lg border overflow-hidden",
-                              isAgent
-                                ? "border-[#6B2D8B]/20 bg-[#FAF5FF]"
-                                : "border-border bg-white"
+                          <div key={msg.id} className="relative">
+                            {/* Connector line between messages */}
+                            {!isFirst && (
+                              <div className="absolute -top-4 left-6 w-px h-4 bg-gradient-to-b from-transparent to-[#E4E4E7]" />
                             )}
-                          >
-                            {/* Email header */}
                             <div className={cn(
-                              "flex items-center justify-between px-4 py-2.5 border-b",
-                              isAgent ? "border-[#6B2D8B]/10 bg-[#F3EAFA]" : "border-border/50 bg-[#FAFAFA]"
+                              "rounded-2xl overflow-hidden shadow-sm transition-all",
+                              isAgent
+                                ? "bg-gradient-to-br from-[#FAF5FF] to-[#F3EAFA] border border-[#6B2D8B]/10"
+                                : "bg-white border border-[#E4E4E7]/80"
                             )}>
-                              <div className="flex items-center gap-2 min-w-0">
+                              {/* Header */}
+                              <div className="flex items-center gap-2.5 px-4 py-3">
                                 <div className={cn(
-                                  "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0",
-                                  isAgent ? "bg-[#6B2D8B] text-white" : "bg-[#E9E9EB] text-[#666]"
+                                  "w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0",
+                                  isAgent
+                                    ? "bg-gradient-to-br from-[#7C3AED] to-[#6B2D8B] text-white shadow-sm shadow-[#6B2D8B]/20"
+                                    : "bg-gradient-to-br from-[#F0F0F0] to-[#E4E4E7] text-[#555]"
                                 )}>
                                   {senderName.charAt(0).toUpperCase()}
                                 </div>
-                                <span className={cn(
-                                  "text-[12px] font-semibold truncate",
-                                  isAgent ? "text-[#6B2D8B]" : "text-foreground"
-                                )}>
-                                  {senderName}
-                                </span>
-                                {isAgent && (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#6B2D8B]/10 text-[#6B2D8B] font-medium shrink-0">
-                                    Agent
-                                  </span>
-                                )}
-                              </div>
-                              <span className="text-[11px] text-muted-foreground shrink-0 ml-2">
-                                {dateStr} {timeStr}
-                              </span>
-                            </div>
-
-                            {/* Email body */}
-                            <div className="px-4 py-3 text-[13px] leading-[1.6] text-foreground">
-                              {body.split("\n").map((line, i) => (
-                                <p key={i} className={line.trim() === "" ? "h-3" : ""}>
-                                  {line || "\u00A0"}
-                                </p>
-                              ))}
-
-                              {imageAttachments.length > 0 && (
-                                <div className={cn("flex flex-wrap gap-2", body.trim() && "mt-3")}>
-                                  {imageAttachments.map((att, i) => (
-                                    <button
-                                      key={i}
-                                      onClick={() => setPhotoLightbox(att.url)}
-                                      className="block rounded-lg overflow-hidden hover:opacity-80 transition-opacity"
-                                    >
-                                      <img
-                                        src={att.url}
-                                        alt={att.name || `Image ${i + 1}`}
-                                        className="max-w-[200px] max-h-[200px] rounded-lg object-cover"
-                                        loading="lazy"
-                                      />
-                                    </button>
-                                  ))}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={cn(
+                                      "text-[12px] font-semibold truncate",
+                                      isAgent ? "text-[#6B2D8B]" : "text-foreground"
+                                    )}>
+                                      {senderName}
+                                    </span>
+                                    {isAgent && (
+                                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#6B2D8B] text-white font-medium shrink-0">
+                                        GDL
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
-                              )}
+                                <span className="text-[10px] text-muted-foreground/70 shrink-0 tabular-nums">
+                                  {dateStr} · {timeStr}
+                                </span>
+                              </div>
 
-                              {/* Quoted/previous email — collapsible */}
-                              {quotedPart && (
-                                <details className="mt-3 group">
-                                  <summary className="text-[11px] text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1 select-none">
-                                    <ChevronUp className="h-3 w-3 rotate-180 group-open:rotate-0 transition-transform" />
-                                    Voir le message précédent
-                                  </summary>
-                                  <div className="mt-2 pl-3 border-l-2 border-muted-foreground/20 text-[12px] text-muted-foreground leading-[1.5]">
-                                    {quotedPart.split("\n").map((line, i) => (
-                                      <p key={i} className={line.trim() === "" ? "h-2" : ""}>
-                                        {line || "\u00A0"}
-                                      </p>
+                              {/* Body */}
+                              <div className="px-4 pb-4 pt-0 text-[13px] leading-[1.7] text-foreground/90">
+                                {body.split("\n").map((line, i) => (
+                                  <p key={i} className={line.trim() === "" ? "h-3" : ""}>
+                                    {line || "\u00A0"}
+                                  </p>
+                                ))}
+
+                                {imageAttachments.length > 0 && (
+                                  <div className={cn("flex flex-wrap gap-2", body.trim() && "mt-3")}>
+                                    {imageAttachments.map((att, i) => (
+                                      <button
+                                        key={i}
+                                        onClick={() => setPhotoLightbox(att.url)}
+                                        className="block rounded-xl overflow-hidden hover:opacity-80 transition-opacity shadow-sm"
+                                      >
+                                        <img
+                                          src={att.url}
+                                          alt={att.name || `Image ${i + 1}`}
+                                          className="max-w-[200px] max-h-[200px] rounded-xl object-cover"
+                                          loading="lazy"
+                                        />
+                                      </button>
                                     ))}
                                   </div>
-                                </details>
-                              )}
+                                )}
+
+                                {/* Quoted content — collapsible */}
+                                {quotedPart && (
+                                  <details className="mt-3 group">
+                                    <summary className="text-[11px] text-muted-foreground/60 cursor-pointer hover:text-muted-foreground flex items-center gap-1.5 select-none py-1">
+                                      <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/[0.04] hover:bg-black/[0.06] transition-colors">
+                                        <ChevronUp className="h-3 w-3 rotate-180 group-open:rotate-0 transition-transform" />
+                                        <span>Message cité</span>
+                                      </div>
+                                    </summary>
+                                    <div className="mt-2 pl-3 border-l-2 border-[#E4E4E7] text-[12px] text-muted-foreground/70 leading-[1.5]">
+                                      {quotedPart.split("\n").map((line, i) => (
+                                        <p key={i} className={line.trim() === "" ? "h-2" : ""}>
+                                          {line || "\u00A0"}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  </details>
+                                )}
+                              </div>
                             </div>
                           </div>
                         )
@@ -2769,9 +2775,9 @@ export default function MessagesPage() {
                 </div>
 
                 {/* Reply area */}
-                <div className="bg-white border-t border-border px-4 py-3 shrink-0">
+                <div className="bg-white/80 backdrop-blur-sm border-t border-[#E4E4E7]/80 px-5 py-4 shrink-0">
                   {sendSuccess && (
-                    <div className="flex items-center gap-2 text-[12px] text-[#047B5D] bg-[#ECFDF5] rounded-lg px-3 py-2 mb-3">
+                    <div className="flex items-center gap-2 text-[12px] text-[#047B5D] bg-[#ECFDF5] rounded-xl px-3.5 py-2.5 mb-3 shadow-sm">
                       <CheckCircle2 className="h-3.5 w-3.5" />
                       Email envoyé avec succès
                     </div>
@@ -2780,45 +2786,36 @@ export default function MessagesPage() {
                     value={replyText}
                     onChange={(e) => { setReplyText(e.target.value); setSendSuccess(false) }}
                     placeholder="Écris ta réponse ou génère-la avec l'IA..."
-                    className="min-h-[90px] pr-4 text-[13px] bg-[#FAFAFA] border-border rounded-xl resize-none focus:bg-white transition-colors"
+                    className="min-h-[80px] text-[13px] bg-[#F8F8FA] border-[#E4E4E7] rounded-2xl resize-none focus:bg-white focus:border-[#6B2D8B]/30 focus:ring-1 focus:ring-[#6B2D8B]/10 transition-all placeholder:text-muted-foreground/40"
                   />
                   <div className="flex items-center gap-2 mt-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    <button
                       onClick={handleGenerateReply}
                       disabled={generating || messages.length === 0}
-                      className="gap-1.5 rounded-lg border-[#6B2D8B]/30 text-[#6B2D8B] hover:bg-[#F3EAFA] hover:border-[#6B2D8B]/50"
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-medium bg-gradient-to-r from-[#6B2D8B]/10 to-[#7C3AED]/10 text-[#6B2D8B] hover:from-[#6B2D8B]/15 hover:to-[#7C3AED]/15 transition-all disabled:opacity-40"
                     >
                       {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                      {generating ? "Génération..." : "Répondre avec IA"}
-                    </Button>
+                      {generating ? "Génération..." : "IA"}
+                    </button>
                     {replyText.trim() && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
+                      <button
                         onClick={() => { navigator.clipboard.writeText(replyText); toast.success("Copié") }}
-                        className="gap-1.5 text-muted-foreground rounded-lg"
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium text-muted-foreground hover:bg-black/[0.04] transition-colors"
                       >
                         <Copy className="h-3.5 w-3.5" />
                         Copier
-                      </Button>
+                      </button>
                     )}
                     <div className="flex-1" />
-                    <Button
-                      size="sm"
+                    <button
                       onClick={handleSendReply}
                       disabled={sending || !replyText.trim()}
-                      className="gap-1.5 rounded-lg bg-[#6B2D8B] hover:bg-[#5a2574] text-white shadow-sm"
+                      className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-[12px] font-semibold bg-gradient-to-r from-[#6B2D8B] to-[#7C3AED] text-white shadow-md shadow-[#6B2D8B]/20 hover:shadow-lg hover:shadow-[#6B2D8B]/25 transition-all disabled:opacity-40 disabled:shadow-none"
                     >
                       {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                       Envoyer
-                    </Button>
+                    </button>
                   </div>
-                  <p className="text-[11px] text-muted-foreground/60 mt-2 flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    L&apos;email sera envoyé au client via Gorgias
-                  </p>
                 </div>
               </>
             )}
