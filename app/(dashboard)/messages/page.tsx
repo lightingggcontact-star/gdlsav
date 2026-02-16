@@ -1289,10 +1289,10 @@ export default function MessagesPage() {
               className={cn(
                 "w-full text-left px-3 py-2.5 transition-all flex items-start gap-3",
                 isSelected
-                  ? "bg-[#18181B] text-white"
+                  ? "bg-[#007AFF] text-white"
                   : isBulkSelected
-                    ? "bg-[#F4F4F5]"
-                    : "hover:bg-white",
+                    ? "bg-[#007AFF]/8"
+                    : "hover:bg-white/60",
                 // Si multi-ticket, on colle les rows et on met une ligne fine entre elles
                 hasMultiple && !isFirst && "border-t border-[#E4E4E7]/60",
                 hasMultiple && !isLast && !isSelected && "pb-2",
@@ -1315,10 +1315,10 @@ export default function MessagesPage() {
                 >
                   <div className={cn(
                     "w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-bold transition-all",
-                    isSelected ? "bg-white/20 text-white"
-                      : isBulkSelected || anyBulkSelected ? "bg-[#18181B] text-white"
-                      : ticketStatus === "unread" ? "bg-[#18181B] text-white"
-                      : "bg-[#E9E9EB] text-[#555]"
+                    isSelected ? "bg-white/25 text-white"
+                      : isBulkSelected || anyBulkSelected ? "bg-[#007AFF] text-white"
+                      : ticketStatus === "unread" ? "bg-[#007AFF] text-white"
+                      : "bg-[#E5E5EA] text-[#8E8E93]"
                   )}>
                     {isBulkSelected || anyBulkSelected ? (
                       <Check className="h-4 w-4" />
@@ -1327,7 +1327,7 @@ export default function MessagesPage() {
                     )}
                   </div>
                   {groupStatus === "unread" && !isSelected && !isBulkSelected && (
-                    <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#18181B] border-2 border-[#F8F8FA]" />
+                    <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#007AFF] border-2 border-[#F2F2F7]" />
                   )}
                 </div>
               ) : (
@@ -1351,7 +1351,7 @@ export default function MessagesPage() {
                     {hasMultiple && (
                       <span className={cn(
                         "text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0",
-                        isSelected ? "bg-white/20 text-white" : "bg-[#18181B]/10 text-[#18181B]"
+                        isSelected ? "bg-white/25 text-white" : "bg-[#007AFF]/10 text-[#007AFF]"
                       )}>
                         {tickets.length}
                       </span>
@@ -1440,14 +1440,14 @@ export default function MessagesPage() {
         className={cn(
           "w-full text-left px-4 py-3.5 transition-all",
           isSelected
-            ? "bg-[#F4F4F5] border-l-[3px] border-l-[#18181B]"
-            : "hover:bg-[#FAFAFA] border-l-[3px] border-l-transparent"
+            ? "bg-[#007AFF]/8 border-l-[3px] border-l-[#007AFF]"
+            : "hover:bg-white/50 border-l-[3px] border-l-transparent"
         )}
       >
         <div className="flex items-start gap-3">
           <div className={cn(
             "w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-[11px] font-semibold mt-0.5",
-            isSelected ? "bg-[#18181B] text-white" : "bg-[#F0F0F0] text-[#666]"
+            isSelected ? "bg-[#007AFF] text-white" : "bg-[#E5E5EA] text-[#8E8E93]"
           )}>
             {getInitials(customerName)}
           </div>
@@ -1455,7 +1455,7 @@ export default function MessagesPage() {
             <div className="flex items-center justify-between gap-2">
               <span className={cn(
                 "text-[13px] truncate",
-                isSelected ? "font-semibold text-[#18181B]" : "font-medium text-foreground"
+                isSelected ? "font-semibold text-[#007AFF]" : "font-medium text-foreground"
               )}>
                 {customerName}
               </span>
@@ -1504,24 +1504,24 @@ export default function MessagesPage() {
       <div className="flex flex-1 min-h-0 gap-0">
 
         {/* ═══ LEFT: Ticket list ═══ */}
-        <div className="w-[320px] shrink-0 flex flex-col border-r border-[#E4E4E7]/80 bg-[#F8F8FA]">
+        <div className="w-[320px] shrink-0 flex flex-col border-r border-black/[0.06] bg-[#F2F2F7]/80 backdrop-blur-xl">
           <div className="px-4 py-3 border-b border-border space-y-2.5">
             {/* Mode toggle: Tickets / SMS */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1 bg-[#F5F5F5] rounded-lg p-0.5">
+              <div className="flex items-center gap-1 bg-black/[0.04] rounded-xl p-0.5">
                 <button
                   onClick={() => { setSidebarMode("tickets"); setSelectedSmsPhone(null) }}
                   className={cn(
                     "flex items-center gap-1.5 px-2.5 h-7 rounded-md text-[12px] font-medium transition-colors",
                     sidebarMode === "tickets"
-                      ? "bg-white text-[#18181B] shadow-sm"
+                      ? "bg-white text-[#007AFF] shadow-sm rounded-lg"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   <Mail className="h-3.5 w-3.5" />
                   Tickets
                   {openTickets.length > 0 && sidebarMode === "tickets" && (
-                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#18181B] text-white text-[10px] font-semibold flex items-center justify-center">
+                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#007AFF] text-white text-[10px] font-semibold flex items-center justify-center">
                       {openTickets.length}
                     </span>
                   )}
@@ -1544,7 +1544,7 @@ export default function MessagesPage() {
                   <>
                     <button
                       onClick={() => setComposeOpen(true)}
-                      className="p-1.5 rounded-md text-muted-foreground hover:text-[#18181B] hover:bg-[#F4F4F5] transition-colors"
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-[#007AFF] hover:bg-[#007AFF]/8 transition-colors"
                       title="Nouveau message"
                     >
                       <Plus className="h-4 w-4" />
@@ -1599,14 +1599,14 @@ export default function MessagesPage() {
                   className={cn(
                     "flex-1 h-7 rounded-md text-[11px] font-medium transition-colors flex items-center justify-center gap-1",
                     activeTab === "all"
-                      ? "bg-[#18181B]/10 text-[#18181B]"
-                      : "text-muted-foreground hover:bg-[#F0F0F0]"
+                      ? "bg-[#007AFF]/10 text-[#007AFF]"
+                      : "text-muted-foreground hover:bg-white/50"
                   )}
                 >
                   À traiter
                   <span className={cn(
                     "text-[10px] px-1 rounded-full",
-                    activeTab === "all" ? "bg-[#18181B]/15" : "bg-[#F0F0F0]"
+                    activeTab === "all" ? "bg-[#007AFF]/15" : "bg-black/[0.04]"
                   )}>{filteredOpen.length}</span>
                 </button>
                 <button
@@ -1935,7 +1935,7 @@ export default function MessagesPage() {
 
         {/* ═══ RIGHT: Conversation ═══ */}
         <div className="flex-1 flex min-w-0">
-          <div className="flex-1 flex flex-col bg-gradient-to-b from-[#FAFAFA] to-[#F4F4F5] min-w-0">
+          <div className="flex-1 flex flex-col bg-gradient-to-b from-[#F2F2F7] to-[#E5E5EA] min-w-0">
             {/* ── SMS Thread View ── */}
             {sidebarMode === "sms" ? (
               !selectedSmsConversation && !smsNewNumber && selectedSmsPhone === null ? (
@@ -2007,7 +2007,7 @@ export default function MessagesPage() {
                       <div className="flex items-center gap-4 flex-wrap">
                         {/* Orders + total spent */}
                         <div className="flex items-center gap-1.5 text-[12px]">
-                          <ShoppingBag className="h-3.5 w-3.5 text-[#18181B]" />
+                          <ShoppingBag className="h-3.5 w-3.5 text-[#007AFF]" />
                           <span className="font-medium">{smsCustomer.customer.numberOfOrders}</span>
                           <span className="text-muted-foreground">commande{smsCustomer.customer.numberOfOrders > 1 ? "s" : ""}</span>
                           <span className="text-muted-foreground">· <span className="font-medium text-foreground">{parseFloat(smsCustomer.customer.totalSpent).toFixed(0)}€</span> dépensés</span>
@@ -2024,7 +2024,7 @@ export default function MessagesPage() {
                                 href={`https://admin.shopify.com/store/grainedelascars/orders/${adminId}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1.5 text-[12px] text-[#18181B] hover:underline"
+                                className="flex items-center gap-1.5 text-[12px] text-[#007AFF] hover:underline"
                               >
                                 <span className="font-medium">{last.name}</span>
                                 <span className="text-muted-foreground">
@@ -2050,7 +2050,7 @@ export default function MessagesPage() {
                                 <div className="flex items-center gap-1.5 text-[12px]">
                                   <Truck className="h-3.5 w-3.5 text-muted-foreground" />
                                   {last.trackingUrl ? (
-                                    <a href={last.trackingUrl} target="_blank" rel="noopener noreferrer" className="text-[#18181B] hover:underline font-mono">
+                                    <a href={last.trackingUrl} target="_blank" rel="noopener noreferrer" className="text-[#007AFF] hover:underline font-mono">
                                       {last.trackingNumber}
                                     </a>
                                   ) : (
@@ -2096,7 +2096,7 @@ export default function MessagesPage() {
                               href={`https://admin.shopify.com/store/grainedelascars/customers/${customerId}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-[12px] text-muted-foreground hover:text-[#18181B] transition-colors"
+                              className="flex items-center gap-1 text-[12px] text-muted-foreground hover:text-[#007AFF] transition-colors"
                               title="Voir client Shopify"
                             >
                               <ExternalLink className="h-3 w-3" />
@@ -2184,7 +2184,7 @@ export default function MessagesPage() {
             ) : !selectedTicket ? (
               <div className="flex-1 flex items-center justify-center text-center">
                 <div>
-                  <div className="w-16 h-16 rounded-3xl bg-white/80 backdrop-blur border border-[#E4E4E7]/60 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-black/[0.03]">
+                  <div className="w-16 h-16 rounded-3xl bg-white/60 backdrop-blur-xl border border-white/40 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-black/[0.04]">
                     <Mail className="h-7 w-7 text-muted-foreground/30" />
                   </div>
                   <p className="text-[14px] font-medium text-muted-foreground/80">Sélectionne un ticket</p>
@@ -2199,9 +2199,9 @@ export default function MessagesPage() {
             ) : (
               <>
                 {/* Ticket header */}
-                <div className="px-5 py-3.5 bg-white/80 backdrop-blur-sm border-b border-[#E4E4E7]/60 flex items-center gap-3 shrink-0">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#F4F4F5] to-[#E4E4E7] flex items-center justify-center shrink-0 shadow-sm">
-                    <span className="text-[12px] font-bold text-[#18181B]">
+                <div className="px-5 py-3.5 bg-white/70 backdrop-blur-xl border-b border-white/40 flex items-center gap-3 shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#007AFF] to-[#5856D6] flex items-center justify-center shrink-0 shadow-sm shadow-[#007AFF]/15">
+                    <span className="text-[12px] font-bold text-white">
                       {getInitials(selectedTicket.customer.name || selectedTicket.customer.email)}
                     </span>
                   </div>
@@ -2225,8 +2225,8 @@ export default function MessagesPage() {
                       className={cn(
                         "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium transition-all",
                         aiChatOpen
-                          ? "bg-gradient-to-r from-[#18181B]/10 to-[#27272A]/10 text-[#18181B]"
-                          : "text-muted-foreground hover:text-[#18181B] hover:bg-[#F4F4F5]"
+                          ? "bg-[#007AFF]/10 text-[#007AFF]"
+                          : "text-muted-foreground hover:text-[#007AFF] hover:bg-[#007AFF]/5"
                       )}
                       title="Chat IA interne"
                     >
@@ -2265,7 +2265,7 @@ export default function MessagesPage() {
                   ) : customerOrders && customerOrders.orders.length > 0 ? (
                     <div className="flex items-center gap-4 flex-wrap">
                       <div className="flex items-center gap-1.5 text-[12px]">
-                        <ShoppingBag className="h-3.5 w-3.5 text-[#18181B]" />
+                        <ShoppingBag className="h-3.5 w-3.5 text-[#007AFF]" />
                         <span className="font-medium">{customerOrders.totalOrders}</span>
                         <span className="text-muted-foreground">commande{customerOrders.totalOrders > 1 ? "s" : ""}</span>
                         {customerOrders.totalSpent && (
@@ -2283,7 +2283,7 @@ export default function MessagesPage() {
                               href={`https://admin.shopify.com/store/grainedelascars/orders/${adminId}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center gap-1.5 text-[12px] text-[#18181B] hover:underline"
+                              className="flex items-center gap-1.5 text-[12px] text-[#007AFF] hover:underline"
                             >
                               <span className="font-medium">{last.name}</span>
                               <span className="text-muted-foreground">
@@ -2309,7 +2309,7 @@ export default function MessagesPage() {
                               <div className="flex items-center gap-1.5 text-[12px]">
                                 <Truck className="h-3.5 w-3.5 text-muted-foreground" />
                                 {last.trackingUrl ? (
-                                  <a href={last.trackingUrl} target="_blank" rel="noopener noreferrer" className="text-[#18181B] hover:underline font-mono">
+                                  <a href={last.trackingUrl} target="_blank" rel="noopener noreferrer" className="text-[#007AFF] hover:underline font-mono">
                                     {last.trackingNumber}
                                   </a>
                                 ) : (
@@ -2327,7 +2327,7 @@ export default function MessagesPage() {
                             {last.photoUrl && (
                               <button
                                 onClick={() => setPhotoLightbox(last.photoUrl)}
-                                className="flex items-center gap-1 text-[12px] text-[#18181B] hover:text-[#09090B] transition-colors"
+                                className="flex items-center gap-1 text-[12px] text-[#007AFF] hover:text-[#0066DD] transition-colors"
                                 title="Voir photo commande"
                               >
                                 <Camera className="h-3.5 w-3.5" />
@@ -2671,7 +2671,6 @@ export default function MessagesPage() {
                         const quotedPart = rawBody.slice(body.length).trim()
                         const msgDate = new Date(msg.created_datetime)
                         const senderName = msg.sender?.name || msg.sender?.email || (isAgent ? "Agent" : "Client")
-                        const isFirst = idx === 0
 
                         const imageAttachments = (msg.attachments || [])
                           .filter(a => a.content_type?.startsWith("image/"))
@@ -2692,103 +2691,102 @@ export default function MessagesPage() {
                           : null
 
                         return (
-                          <div key={msg.id} className="relative">
-                            {/* Connector line between messages */}
-                            {!isFirst && (
-                              <div className="absolute -top-4 left-6 w-px h-4 bg-gradient-to-b from-transparent to-[#E4E4E7]" />
-                            )}
+                          <div key={msg.id}>
                             {/* Previous message preview */}
                             {prevMsg && prevBody && (
-                              <div className="mb-1.5 ml-10 flex items-start gap-1.5 text-[11px] text-muted-foreground/50">
-                                <span className="shrink-0 font-medium text-muted-foreground/60">
-                                  {prevMsg.from_agent ? "↩" : "↪"} {prevSender} :
-                                </span>
-                                <span className="truncate italic">
-                                  {prevBody}{prevBody.length >= 120 ? "…" : ""}
+                              <div className={cn(
+                                "mb-1 flex items-start gap-1.5 text-[11px] text-muted-foreground/40",
+                                isAgent ? "justify-end pr-1" : "pl-1"
+                              )}>
+                                <span className="truncate italic max-w-[70%]">
+                                  {prevMsg.from_agent ? "↩ " : "↪ "}{prevSender} : {prevBody}{prevBody.length >= 120 ? "…" : ""}
                                 </span>
                               </div>
                             )}
-                            <div className={cn(
-                              "rounded-2xl overflow-hidden shadow-sm transition-all",
-                              isAgent
-                                ? "bg-gradient-to-br from-[#FAFAFA] to-[#F4F4F5] border border-[#18181B]/10"
-                                : "bg-white border border-[#E4E4E7]/80"
-                            )}>
-                              {/* Header */}
-                              <div className="flex items-center gap-2.5 px-4 py-3">
+                            <div className={cn("flex", isAgent ? "justify-end" : "justify-start")}>
+                              <div className={cn(
+                                "max-w-[75%] rounded-[20px] overflow-hidden transition-all",
+                                isAgent
+                                  ? "bg-[#007AFF] text-white rounded-br-md shadow-sm shadow-[#007AFF]/20"
+                                  : "bg-white/80 backdrop-blur-sm border border-white/60 text-foreground rounded-bl-md shadow-sm shadow-black/[0.04]"
+                              )}>
+                                {/* Sender + time */}
                                 <div className={cn(
-                                  "w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0",
-                                  isAgent
-                                    ? "bg-gradient-to-br from-[#27272A] to-[#18181B] text-white shadow-sm shadow-[#18181B]/20"
-                                    : "bg-gradient-to-br from-[#F0F0F0] to-[#E4E4E7] text-[#555]"
+                                  "flex items-center gap-2 px-4 pt-3 pb-1",
+                                  isAgent ? "justify-between" : "justify-between"
                                 )}>
-                                  {senderName.charAt(0).toUpperCase()}
+                                  <span className={cn(
+                                    "text-[11px] font-semibold",
+                                    isAgent ? "text-white/80" : "text-foreground/70"
+                                  )}>
+                                    {senderName}
+                                  </span>
+                                  <span className={cn(
+                                    "text-[10px] tabular-nums shrink-0",
+                                    isAgent ? "text-white/40" : "text-muted-foreground/50"
+                                  )}>
+                                    {dateStr} · {timeStr}
+                                  </span>
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className={cn(
-                                      "text-[12px] font-semibold truncate",
-                                      isAgent ? "text-[#18181B]" : "text-foreground"
-                                    )}>
-                                      {senderName}
-                                    </span>
-                                    {isAgent && (
-                                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#18181B] text-white font-medium shrink-0">
-                                        GDL
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                <span className="text-[10px] text-muted-foreground/70 shrink-0 tabular-nums">
-                                  {dateStr} · {timeStr}
-                                </span>
-                              </div>
 
-                              {/* Body */}
-                              <div className="px-4 pb-4 pt-0 text-[13px] leading-[1.7] text-foreground/90">
-                                {body.split("\n").map((line, i) => (
-                                  <p key={i} className={line.trim() === "" ? "h-3" : ""}>
-                                    {line || "\u00A0"}
-                                  </p>
-                                ))}
+                                {/* Body */}
+                                <div className={cn(
+                                  "px-4 pb-3.5 text-[13px] leading-[1.65]",
+                                  isAgent ? "text-white" : "text-foreground/90"
+                                )}>
+                                  {body.split("\n").map((line, i) => (
+                                    <p key={i} className={line.trim() === "" ? "h-2.5" : ""}>
+                                      {line || "\u00A0"}
+                                    </p>
+                                  ))}
 
-                                {imageAttachments.length > 0 && (
-                                  <div className={cn("flex flex-wrap gap-2", body.trim() && "mt-3")}>
-                                    {imageAttachments.map((att, i) => (
-                                      <button
-                                        key={i}
-                                        onClick={() => setPhotoLightbox(att.url)}
-                                        className="block rounded-xl overflow-hidden hover:opacity-80 transition-opacity shadow-sm"
-                                      >
-                                        <img
-                                          src={att.url}
-                                          alt={att.name || `Image ${i + 1}`}
-                                          className="max-w-[200px] max-h-[200px] rounded-xl object-cover"
-                                          loading="lazy"
-                                        />
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
-
-                                {/* Quoted content — collapsible */}
-                                {quotedPart && (
-                                  <details className="mt-3 group">
-                                    <summary className="text-[11px] text-muted-foreground/60 cursor-pointer hover:text-muted-foreground flex items-center gap-1.5 select-none py-1">
-                                      <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/[0.04] hover:bg-black/[0.06] transition-colors">
-                                        <ChevronUp className="h-3 w-3 rotate-180 group-open:rotate-0 transition-transform" />
-                                        <span>Message cité</span>
-                                      </div>
-                                    </summary>
-                                    <div className="mt-2 pl-3 border-l-2 border-[#E4E4E7] text-[12px] text-muted-foreground/70 leading-[1.5]">
-                                      {quotedPart.split("\n").map((line, i) => (
-                                        <p key={i} className={line.trim() === "" ? "h-2" : ""}>
-                                          {line || "\u00A0"}
-                                        </p>
+                                  {imageAttachments.length > 0 && (
+                                    <div className={cn("flex flex-wrap gap-2", body.trim() && "mt-3")}>
+                                      {imageAttachments.map((att, i) => (
+                                        <button
+                                          key={i}
+                                          onClick={() => setPhotoLightbox(att.url)}
+                                          className="block rounded-xl overflow-hidden hover:opacity-80 transition-opacity"
+                                        >
+                                          <img
+                                            src={att.url}
+                                            alt={att.name || `Image ${i + 1}`}
+                                            className="max-w-[200px] max-h-[200px] rounded-xl object-cover"
+                                            loading="lazy"
+                                          />
+                                        </button>
                                       ))}
                                     </div>
-                                  </details>
-                                )}
+                                  )}
+
+                                  {/* Quoted content — collapsible */}
+                                  {quotedPart && (
+                                    <details className="mt-2.5 group">
+                                      <summary className={cn(
+                                        "text-[11px] cursor-pointer flex items-center gap-1.5 select-none py-0.5",
+                                        isAgent ? "text-white/40 hover:text-white/60" : "text-muted-foreground/50 hover:text-muted-foreground"
+                                      )}>
+                                        <div className={cn(
+                                          "flex items-center gap-1 px-2 py-0.5 rounded-full transition-colors",
+                                          isAgent ? "bg-white/10 hover:bg-white/15" : "bg-black/[0.04] hover:bg-black/[0.06]"
+                                        )}>
+                                          <ChevronUp className="h-3 w-3 rotate-180 group-open:rotate-0 transition-transform" />
+                                          <span>Message cité</span>
+                                        </div>
+                                      </summary>
+                                      <div className={cn(
+                                        "mt-2 pl-3 border-l-2 text-[12px] leading-[1.5]",
+                                        isAgent ? "border-white/20 text-white/50" : "border-[#E4E4E7] text-muted-foreground/60"
+                                      )}>
+                                        {quotedPart.split("\n").map((line, i) => (
+                                          <p key={i} className={line.trim() === "" ? "h-2" : ""}>
+                                            {line || "\u00A0"}
+                                          </p>
+                                        ))}
+                                      </div>
+                                    </details>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -2800,7 +2798,7 @@ export default function MessagesPage() {
                 </div>
 
                 {/* Reply area */}
-                <div className="bg-white/80 backdrop-blur-sm border-t border-[#E4E4E7]/80 px-5 py-4 shrink-0">
+                <div className="bg-white/70 backdrop-blur-xl border-t border-white/40 px-5 py-4 shrink-0">
                   {sendSuccess && (
                     <div className="flex items-center gap-2 text-[12px] text-[#047B5D] bg-[#ECFDF5] rounded-xl px-3.5 py-2.5 mb-3 shadow-sm">
                       <CheckCircle2 className="h-3.5 w-3.5" />
@@ -2811,13 +2809,13 @@ export default function MessagesPage() {
                     value={replyText}
                     onChange={(e) => { setReplyText(e.target.value); setSendSuccess(false) }}
                     placeholder="Écris ta réponse ou génère-la avec l'IA..."
-                    className="min-h-[80px] text-[13px] bg-[#F8F8FA] border-[#E4E4E7] rounded-2xl resize-none focus:bg-white focus:border-[#18181B]/30 focus:ring-1 focus:ring-[#18181B]/10 transition-all placeholder:text-muted-foreground/40"
+                    className="min-h-[80px] text-[13px] bg-white/60 backdrop-blur-sm border-[#E4E4E7]/50 rounded-2xl resize-none focus:bg-white focus:border-[#007AFF]/30 focus:ring-1 focus:ring-[#007AFF]/10 transition-all placeholder:text-muted-foreground/40"
                   />
                   <div className="flex items-center gap-2 mt-3">
                     <button
                       onClick={handleGenerateReply}
                       disabled={generating || messages.length === 0}
-                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-medium bg-gradient-to-r from-[#18181B]/10 to-[#27272A]/10 text-[#18181B] hover:from-[#18181B]/15 hover:to-[#27272A]/15 transition-all disabled:opacity-40"
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-medium bg-[#007AFF]/10 text-[#007AFF] hover:bg-[#007AFF]/15 transition-all disabled:opacity-40"
                     >
                       {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                       {generating ? "Génération..." : "IA"}
@@ -2835,7 +2833,7 @@ export default function MessagesPage() {
                     <button
                       onClick={handleSendReply}
                       disabled={sending || !replyText.trim()}
-                      className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-[12px] font-semibold bg-gradient-to-r from-[#18181B] to-[#27272A] text-white shadow-md shadow-[#18181B]/20 hover:shadow-lg hover:shadow-[#18181B]/25 transition-all disabled:opacity-40 disabled:shadow-none"
+                      className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-[12px] font-semibold bg-[#007AFF] text-white shadow-md shadow-[#007AFF]/25 hover:bg-[#0066DD] hover:shadow-lg hover:shadow-[#007AFF]/30 transition-all disabled:opacity-40 disabled:shadow-none"
                     >
                       {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                       Envoyer
@@ -2848,10 +2846,10 @@ export default function MessagesPage() {
 
           {/* ═══ AI Chat Panel ═══ */}
           {aiChatOpen && selectedTicket && (
-            <div className="w-[300px] shrink-0 flex flex-col border-l border-border bg-white">
-              <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
+            <div className="w-[300px] shrink-0 flex flex-col border-l border-black/[0.06] bg-[#F2F2F7]/60 backdrop-blur-xl">
+              <div className="px-4 py-3 border-b border-black/[0.06] flex items-center justify-between shrink-0 bg-white/50 backdrop-blur-sm">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-md bg-[#D97706] flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-[#007AFF] to-[#5856D6] flex items-center justify-center">
                     <Sparkles className="h-3.5 w-3.5 text-white" />
                   </div>
                   <span className="text-[13px] font-semibold">Assistant Claude</span>
@@ -2866,8 +2864,8 @@ export default function MessagesPage() {
 
               {aiChatMessages.length === 0 && (
                 <div className="px-4 py-6 text-center">
-                  <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] flex items-center justify-center mx-auto mb-3">
-                    <Sparkles className="h-5 w-5 text-[#D97706]" />
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#007AFF]/10 to-[#5856D6]/10 flex items-center justify-center mx-auto mb-3">
+                    <Sparkles className="h-5 w-5 text-[#007AFF]" />
                   </div>
                   <p className="text-[13px] font-medium text-foreground">Chat interne IA</p>
                   <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
@@ -2882,8 +2880,8 @@ export default function MessagesPage() {
                     <div className={cn(
                       "max-w-[90%] rounded-2xl px-3.5 py-2 text-[12.5px] leading-[1.5]",
                       msg.role === "user"
-                        ? "bg-[#18181B] text-white rounded-br-md"
-                        : "bg-[#F5F5F5] text-[#1a1a1a] rounded-bl-md"
+                        ? "bg-[#007AFF] text-white rounded-br-md"
+                        : "bg-white/80 backdrop-blur-sm text-foreground rounded-bl-md shadow-sm shadow-black/[0.03]"
                     )}>
                       {msg.content.split("\n").map((line, i) => (
                         <p key={i} className={line.trim() === "" ? "h-2" : ""}>{line || "\u00A0"}</p>
@@ -2893,7 +2891,7 @@ export default function MessagesPage() {
                 ))}
                 {aiChatLoading && (
                   <div className="flex items-start">
-                    <div className="bg-[#F5F5F5] rounded-2xl rounded-bl-md px-4 py-3">
+                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl rounded-bl-md px-4 py-3 shadow-sm shadow-black/[0.03]">
                       <div className="flex gap-1">
                         <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: "0ms" }} />
                         <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: "150ms" }} />
@@ -2905,7 +2903,7 @@ export default function MessagesPage() {
                 <div ref={aiChatEndRef} />
               </div>
 
-              <div className="px-3 py-3 border-t border-border shrink-0">
+              <div className="px-3 py-3 border-t border-black/[0.06] bg-white/50 backdrop-blur-sm shrink-0">
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -2918,7 +2916,7 @@ export default function MessagesPage() {
                   <button
                     onClick={handleAiChat}
                     disabled={aiChatLoading || !aiChatInput.trim()}
-                    className="h-9 w-9 rounded-lg bg-[#18181B] hover:bg-[#09090B] text-white flex items-center justify-center shrink-0 disabled:opacity-40 transition-colors"
+                    className="h-9 w-9 rounded-lg bg-[#007AFF] hover:bg-[#0066DD] text-white flex items-center justify-center shrink-0 disabled:opacity-40 transition-colors"
                   >
                     <Send className="h-3.5 w-3.5" />
                   </button>
