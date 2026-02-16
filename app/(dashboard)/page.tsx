@@ -179,35 +179,7 @@ function getPeriodDates(period: AnalysisPeriod, customFrom?: string, customTo?: 
   }
 }
 
-function stripHtmlSimple(html: string): string {
-  return html
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/\s+/g, " ")
-    .trim()
-}
-
-interface AnalysisMessage {
-  body_text: string | null
-  body_html: string | null
-  from_agent: boolean
-  public: boolean
-}
-
-interface AnalysisTicket {
-  id: number
-  subject: string | null
-  status: string
-  priority: string | null
-  customer: { name: string; email: string }
-  created_datetime: string
-  tags: { name: string }[]
-}
+// (Ticket data is read from Supabase ticket_cache table)
 
 function TicketAnalysisSection() {
   const [period, setPeriod] = useState<AnalysisPeriod>("this_week")
@@ -216,6 +188,22 @@ function TicketAnalysisSection() {
   const [analyzing, setAnalyzing] = useState(false)
   const [recap, setRecap] = useState<string | null>(null)
 
+  const [syncing, setSyncing] = useState(false)
+  const [lastSync, setLastSync] = useState<string | null>(null)
+  const supabaseAnalysis = useSupabase()
+
+  async function handleSync() {
+    setSyncing(true)
+    try {
+      const res = await fetch("/api/gorgias/sync", { method: "POST" })
+      if (res.ok) {
+        const data = await res.json()
+        setLastSync(`${data.total} tickets (${data.synced} mis à jour)`)
+      }
+    } catch { /* silent */ }
+    setSyncing(false)
+  }
+
   async function handleAnalyze() {
     setAnalyzing(true)
     setRecap(null)
@@ -223,67 +211,37 @@ function TicketAnalysisSection() {
     try {
       const { from, to } = getPeriodDates(period, customFrom, customTo)
 
-      // Fetch tickets
-      const ticketsRes = await fetch("/api/gorgias/tickets")
-      if (!ticketsRes.ok) {
+      // Read from Supabase cache (fast!)
+      const { data: cached, error } = await supabaseAnalysis
+        .from("ticket_cache")
+        .select("*")
+        .gte("created_at", from.toISOString())
+        .lte("created_at", to.toISOString())
+        .order("created_at", { ascending: false })
+        .limit(25)
+
+      if (error || !cached || cached.length === 0) {
+        setRecap(cached?.length === 0
+          ? "Aucun ticket sur cette période. Cliquez 'Sync' pour synchroniser les tickets depuis Gorgias."
+          : "Erreur de lecture. Lancez une sync d'abord.")
         setAnalyzing(false)
         return
       }
-      const ticketsData = await ticketsRes.json()
-      const allTickets = (ticketsData.data || []) as AnalysisTicket[]
 
-      const filtered = allTickets.filter((t) => {
-        const d = new Date(t.created_datetime)
-        return d >= from && d <= to
-      })
-
-      if (filtered.length === 0) {
-        setRecap("Aucun ticket sur cette période.")
-        setAnalyzing(false)
-        return
-      }
-
-      // Fetch messages for each ticket (batched)
-      const ticketsForRecap: Array<{
-        id: number; subject: string | null; status: string; priority: string | null
-        customerName: string; customerEmail: string; createdAt: string
-        tags: string[]; firstMessage: string; lastMessage: string; messageCount: number
-      }> = []
-
-      for (let i = 0; i < filtered.length; i += 5) {
-        const batch = filtered.slice(i, i + 5)
-        const results = await Promise.all(
-          batch.map(async (ticket) => {
-            let publicMsgs: AnalysisMessage[] = []
-            try {
-              const res = await fetch(`/api/gorgias/tickets/${ticket.id}/messages`)
-              if (res.ok) {
-                const data = await res.json()
-                publicMsgs = ((data.data || []) as AnalysisMessage[]).filter(m => m.public)
-              }
-            } catch { /* skip */ }
-
-            const firstMsg = publicMsgs[0]
-            const lastMsg = publicMsgs[publicMsgs.length - 1]
-            const getText = (m: AnalysisMessage) => m.body_text || stripHtmlSimple(m.body_html || "")
-
-            return {
-              id: ticket.id,
-              subject: ticket.subject,
-              status: ticket.status,
-              priority: ticket.priority,
-              customerName: ticket.customer.name || ticket.customer.email,
-              customerEmail: ticket.customer.email,
-              createdAt: new Date(ticket.created_datetime).toLocaleDateString("fr-FR"),
-              tags: ticket.tags.map(t => t.name),
-              firstMessage: firstMsg ? getText(firstMsg).slice(0, 500) : "",
-              lastMessage: lastMsg ? getText(lastMsg).slice(0, 500) : "",
-              messageCount: publicMsgs.length,
-            }
-          })
-        )
-        ticketsForRecap.push(...results)
-      }
+      // Map to the format expected by the AI API
+      const ticketsForRecap = cached.map((t: any) => ({
+        id: t.ticket_id,
+        subject: t.subject,
+        status: t.status,
+        priority: t.priority,
+        customerName: t.customer_name,
+        customerEmail: t.customer_email,
+        createdAt: new Date(t.created_at).toLocaleDateString("fr-FR"),
+        tags: t.tags || [],
+        firstMessage: t.first_message || "",
+        lastMessage: t.last_message || "",
+        messageCount: t.message_count || 0,
+      }))
 
       // Call AI
       const res = await fetch("/api/ai/ticket-recap", {
@@ -322,12 +280,24 @@ function TicketAnalysisSection() {
           <Mail className="h-4 w-4 text-[#6B2D8B]" />
           Analyse Messages
         </h2>
-        {recap && (
-          <Button variant="outline" size="sm" onClick={handleExport} className="gap-2 text-xs h-7">
-            <FileText className="h-3.5 w-3.5" />
-            Exporter .md
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSync}
+            disabled={syncing}
+            className="gap-2 text-xs h-7"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", syncing && "animate-spin")} />
+            {syncing ? "Sync..." : "Sync tickets"}
           </Button>
-        )}
+          {recap && (
+            <Button variant="outline" size="sm" onClick={handleExport} className="gap-2 text-xs h-7">
+              <FileText className="h-3.5 w-3.5" />
+              Exporter .md
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="p-5">
@@ -424,8 +394,11 @@ function TicketAnalysisSection() {
             </div>
             <p className="text-sm font-medium">Analyse des tickets</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Sélectionnez une période et cliquez sur Analyser
+              Cliquez &quot;Sync tickets&quot; puis sélectionnez une période et cliquez Analyser
             </p>
+            {lastSync && (
+              <p className="text-[10px] text-muted-foreground/60 mt-2">Dernière sync : {lastSync}</p>
+            )}
           </div>
         )}
       </div>
