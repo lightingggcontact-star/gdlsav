@@ -129,6 +129,310 @@ function CategoryTag({ category }: { category: string }) {
   )
 }
 
+// ─── Ticket Analysis Section ───
+
+type AnalysisPeriod = "this_week" | "last_week" | "this_month" | "custom"
+
+const PERIOD_LABELS: Record<AnalysisPeriod, string> = {
+  this_week: "Cette semaine",
+  last_week: "Semaine dernière",
+  this_month: "Ce mois",
+  custom: "Personnalisé",
+}
+
+function getPeriodDates(period: AnalysisPeriod, customFrom?: string, customTo?: string): { from: Date; to: Date } {
+  const now = new Date()
+  const to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+
+  switch (period) {
+    case "this_week": {
+      const day = now.getDay()
+      const diff = day === 0 ? 6 : day - 1 // Monday = start
+      const from = new Date(now)
+      from.setDate(now.getDate() - diff)
+      from.setHours(0, 0, 0, 0)
+      return { from, to }
+    }
+    case "last_week": {
+      const day = now.getDay()
+      const diff = day === 0 ? 6 : day - 1
+      const thisMonday = new Date(now)
+      thisMonday.setDate(now.getDate() - diff)
+      const lastMonday = new Date(thisMonday)
+      lastMonday.setDate(thisMonday.getDate() - 7)
+      lastMonday.setHours(0, 0, 0, 0)
+      const lastSunday = new Date(thisMonday)
+      lastSunday.setDate(thisMonday.getDate() - 1)
+      lastSunday.setHours(23, 59, 59)
+      return { from: lastMonday, to: lastSunday }
+    }
+    case "this_month": {
+      const from = new Date(now.getFullYear(), now.getMonth(), 1)
+      return { from, to }
+    }
+    case "custom": {
+      return {
+        from: customFrom ? new Date(customFrom) : new Date(now.getTime() - 7 * 86400000),
+        to: customTo ? new Date(customTo + "T23:59:59") : to,
+      }
+    }
+  }
+}
+
+function stripHtmlSimple(html: string): string {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+interface AnalysisMessage {
+  body_text: string | null
+  body_html: string | null
+  from_agent: boolean
+  public: boolean
+}
+
+interface AnalysisTicket {
+  id: number
+  subject: string | null
+  status: string
+  priority: string | null
+  customer: { name: string; email: string }
+  created_datetime: string
+  tags: { name: string }[]
+}
+
+function TicketAnalysisSection() {
+  const [period, setPeriod] = useState<AnalysisPeriod>("this_week")
+  const [customFrom, setCustomFrom] = useState("")
+  const [customTo, setCustomTo] = useState("")
+  const [analyzing, setAnalyzing] = useState(false)
+  const [recap, setRecap] = useState<string | null>(null)
+
+  async function handleAnalyze() {
+    setAnalyzing(true)
+    setRecap(null)
+
+    try {
+      const { from, to } = getPeriodDates(period, customFrom, customTo)
+
+      // Fetch tickets
+      const ticketsRes = await fetch("/api/gorgias/tickets")
+      if (!ticketsRes.ok) {
+        setAnalyzing(false)
+        return
+      }
+      const ticketsData = await ticketsRes.json()
+      const allTickets = (ticketsData.data || []) as AnalysisTicket[]
+
+      const filtered = allTickets.filter((t) => {
+        const d = new Date(t.created_datetime)
+        return d >= from && d <= to
+      })
+
+      if (filtered.length === 0) {
+        setRecap("Aucun ticket sur cette période.")
+        setAnalyzing(false)
+        return
+      }
+
+      // Fetch messages for each ticket (batched)
+      const ticketsForRecap: Array<{
+        id: number; subject: string | null; status: string; priority: string | null
+        customerName: string; customerEmail: string; createdAt: string
+        tags: string[]; firstMessage: string; lastMessage: string; messageCount: number
+      }> = []
+
+      for (let i = 0; i < filtered.length; i += 5) {
+        const batch = filtered.slice(i, i + 5)
+        const results = await Promise.all(
+          batch.map(async (ticket) => {
+            let publicMsgs: AnalysisMessage[] = []
+            try {
+              const res = await fetch(`/api/gorgias/tickets/${ticket.id}/messages`)
+              if (res.ok) {
+                const data = await res.json()
+                publicMsgs = ((data.data || []) as AnalysisMessage[]).filter(m => m.public)
+              }
+            } catch { /* skip */ }
+
+            const firstMsg = publicMsgs[0]
+            const lastMsg = publicMsgs[publicMsgs.length - 1]
+            const getText = (m: AnalysisMessage) => m.body_text || stripHtmlSimple(m.body_html || "")
+
+            return {
+              id: ticket.id,
+              subject: ticket.subject,
+              status: ticket.status,
+              priority: ticket.priority,
+              customerName: ticket.customer.name || ticket.customer.email,
+              customerEmail: ticket.customer.email,
+              createdAt: new Date(ticket.created_datetime).toLocaleDateString("fr-FR"),
+              tags: ticket.tags.map(t => t.name),
+              firstMessage: firstMsg ? getText(firstMsg).slice(0, 500) : "",
+              lastMessage: lastMsg ? getText(lastMsg).slice(0, 500) : "",
+              messageCount: publicMsgs.length,
+            }
+          })
+        )
+        ticketsForRecap.push(...results)
+      }
+
+      // Call AI
+      const res = await fetch("/api/ai/ticket-recap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tickets: ticketsForRecap }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setRecap(data.recap)
+      } else {
+        setRecap("Erreur lors de l'analyse IA.")
+      }
+    } catch {
+      setRecap("Erreur de connexion.")
+    }
+    setAnalyzing(false)
+  }
+
+  function handleExport() {
+    if (!recap) return
+    const blob = new Blob([recap], { type: "text/markdown;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `recap-sav-${new Date().toISOString().slice(0, 10)}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-card shadow-[0_1px_0_0_rgba(0,0,0,.05)] overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        <h2 className="text-[13px] font-semibold flex items-center gap-2">
+          <Mail className="h-4 w-4 text-[#6B2D8B]" />
+          Analyse Messages
+        </h2>
+        {recap && (
+          <Button variant="outline" size="sm" onClick={handleExport} className="gap-2 text-xs h-7">
+            <FileText className="h-3.5 w-3.5" />
+            Exporter .md
+          </Button>
+        )}
+      </div>
+
+      <div className="p-5">
+        {/* Period selector */}
+        <div className="flex flex-wrap items-end gap-3 mb-4">
+          <div className="flex gap-1.5">
+            {(Object.keys(PERIOD_LABELS) as AnalysisPeriod[]).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors",
+                  period === p
+                    ? "bg-[#6B2D8B] text-white"
+                    : "bg-[#F5F5F5] text-muted-foreground hover:bg-[#E9E9EB]"
+                )}
+              >
+                {PERIOD_LABELS[p]}
+              </button>
+            ))}
+          </div>
+
+          {period === "custom" && (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="h-8 px-2 text-[12px] border border-border rounded-md bg-background"
+              />
+              <span className="text-xs text-muted-foreground">→</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="h-8 px-2 text-[12px] border border-border rounded-md bg-background"
+              />
+            </div>
+          )}
+
+          <Button
+            onClick={handleAnalyze}
+            disabled={analyzing}
+            size="sm"
+            className="bg-[#6B2D8B] text-white hover:bg-[#6B2D8B]/90 gap-2 h-8"
+          >
+            {analyzing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5" />
+            )}
+            {analyzing ? "Analyse en cours..." : "Analyser"}
+          </Button>
+        </div>
+
+        {/* Result */}
+        {analyzing && (
+          <div className="flex items-center gap-3 py-8 justify-center text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span className="text-sm">L&apos;IA analyse les tickets...</span>
+          </div>
+        )}
+
+        {recap && !analyzing && (
+          <div className="rounded-lg border border-border bg-[#FAFAFA] p-5 max-h-[500px] overflow-y-auto">
+            <div className="prose prose-sm max-w-none text-[13px] text-foreground leading-relaxed [&_h1]:text-base [&_h1]:font-bold [&_h1]:mb-3 [&_h2]:text-[13px] [&_h2]:font-semibold [&_h2]:mt-5 [&_h2]:mb-2 [&_h3]:text-[13px] [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:mb-2 [&_ul]:pl-4 [&_ol]:pl-4 [&_li]:mb-1 [&_strong]:text-foreground [&_hr]:my-4 [&_hr]:border-border">
+              {recap.split("\n").map((line, i) => {
+                if (line.startsWith("# ")) return <h1 key={i}>{line.slice(2)}</h1>
+                if (line.startsWith("## ")) return <h2 key={i}>{line.slice(3)}</h2>
+                if (line.startsWith("### ")) return <h3 key={i}>{line.slice(4)}</h3>
+                if (line.startsWith("---")) return <hr key={i} />
+                if (line.startsWith("- **")) {
+                  const parts = line.slice(2).split("**")
+                  return <li key={i}><strong>{parts[1]}</strong>{parts[2] || ""}</li>
+                }
+                if (line.startsWith("- ")) return <li key={i}>{line.slice(2)}</li>
+                if (line.match(/^\d+\.\s/)) return <li key={i}>{line.replace(/^\d+\.\s/, "")}</li>
+                if (line.startsWith("*") && line.endsWith("*")) return <p key={i} className="text-xs text-muted-foreground italic">{line.replace(/\*/g, "")}</p>
+                if (line.startsWith("**")) {
+                  const clean = line.replace(/\*\*/g, "")
+                  return <p key={i}><strong>{clean}</strong></p>
+                }
+                if (line.trim() === "") return <div key={i} className="h-1" />
+                return <p key={i}>{line}</p>
+              })}
+            </div>
+          </div>
+        )}
+
+        {!recap && !analyzing && (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="w-10 h-10 rounded-full bg-[#F3EAFA] flex items-center justify-center mb-3">
+              <Mail className="h-5 w-5 text-[#6B2D8B]" />
+            </div>
+            <p className="text-sm font-medium">Analyse des tickets</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Sélectionnez une période et cliquez sur Analyser
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Page ───
 
 export default function DashboardPage() {
@@ -707,6 +1011,9 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Analyse Messages IA */}
+      <TicketAnalysisSection />
 
       {/* Email Dialog */}
       <GenerateEmailDialog
