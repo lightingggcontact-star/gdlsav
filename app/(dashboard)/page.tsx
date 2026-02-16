@@ -1,38 +1,25 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import {
-  AlertTriangle,
   Package,
-  TrendingUp,
-  FileText,
-  ArrowRight,
   Clock,
   RefreshCw,
   ExternalLink,
   Sparkles,
   Mail,
-  Star,
-  CheckCircle2,
   MessageSquare,
-  CircleDot,
   Loader2,
-  ChevronDown,
-  Filter,
+  ArrowRight,
+  FileText,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
-import {
-  getReviewStatuses,
-  setReviewStatus,
-  STATUS_CONFIG,
-  type ReviewStatusType,
-} from "@/lib/review-status"
 import { useSupabase } from "@/lib/supabase/use-supabase"
-import { GenerateEmailDialog } from "@/components/generate-email-dialog"
+import { SavTrendsChart } from "@/components/sav-trends-chart"
 import type { EnrichedOrder } from "@/lib/types"
 import {
   BarChart,
@@ -52,23 +39,10 @@ interface ShippingResponse {
   fetchedAt: string
 }
 
-interface CriticalReview {
-  submissionId: string
-  formId: string
-  formName: string
-  rating: number
-  email: string | null
-  customerName: string | null
-  feedback: string | null
-  submissionDate: string
-  allQuestions: { name: string; type: string; value: unknown }[]
-}
-
-interface ReviewAnalysis {
-  submissionId: string
-  urgency: number
-  category: string
-  suggestedAction: string
+interface GorgiasTicket {
+  id: number
+  status: string
+  created_datetime: string
 }
 
 // ─── Small components ───
@@ -95,38 +69,12 @@ function KpiCard({
   return href ? <Link href={href}>{content}</Link> : content
 }
 
-function StatusBadge({ status, onClick }: { status: ReviewStatusType; onClick?: () => void }) {
-  const cfg = STATUS_CONFIG[status]
-  return (
-    <button
-      onClick={onClick}
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold transition-colors hover:opacity-80"
-      style={{ backgroundColor: cfg.bg, color: cfg.color }}
-    >
-      {status === "new" && <CircleDot className="h-3 w-3" />}
-      {status === "contacted" && <MessageSquare className="h-3 w-3" />}
-      {status === "resolved" && <CheckCircle2 className="h-3 w-3" />}
-      {cfg.label}
-    </button>
-  )
-}
-
-function CategoryTag({ category }: { category: string }) {
-  const colors: Record<string, { bg: string; text: string }> = {
-    livraison: { bg: "#EAF4FF", text: "#005BD3" },
-    qualité: { bg: "#FEE8EB", text: "#C70A24" },
-    goût: { bg: "#FFF1E3", text: "#8A6116" },
-    emballage: { bg: "#EAF3FF", text: "#007AFF" },
-    prix: { bg: "#FFF1E3", text: "#8A6116" },
-    service: { bg: "#EAF4FF", text: "#005BD3" },
-    autre: { bg: "#F1F1F1", text: "#616161" },
-  }
-  const c = colors[category] ?? colors.autre
-  return (
-    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ backgroundColor: c.bg, color: c.text }}>
-      {category}
-    </span>
-  )
+function formatDuration(minutes: number): string {
+  if (minutes <= 0) return "—"
+  if (minutes < 60) return `${Math.round(minutes)}min`
+  const h = Math.floor(minutes / 60)
+  const m = Math.round(minutes % 60)
+  return m > 0 ? `${h}h ${m}min` : `${h}h`
 }
 
 // ─── Ticket Analysis Section ───
@@ -147,7 +95,7 @@ function getPeriodDates(period: AnalysisPeriod, customFrom?: string, customTo?: 
   switch (period) {
     case "this_week": {
       const day = now.getDay()
-      const diff = day === 0 ? 6 : day - 1 // Monday = start
+      const diff = day === 0 ? 6 : day - 1
       const from = new Date(now)
       from.setDate(now.getDate() - diff)
       from.setHours(0, 0, 0, 0)
@@ -178,8 +126,6 @@ function getPeriodDates(period: AnalysisPeriod, customFrom?: string, customTo?: 
     }
   }
 }
-
-// (Ticket data is read from Supabase ticket_cache table)
 
 function TicketAnalysisSection() {
   const [period, setPeriod] = useState<AnalysisPeriod>("this_week")
@@ -231,7 +177,6 @@ function TicketAnalysisSection() {
     try {
       const { from, to } = getPeriodDates(period, customFrom, customTo)
 
-      // Read from Supabase cache (fast!)
       const { data: cached, error } = await supabaseAnalysis
         .from("ticket_cache")
         .select("*")
@@ -248,7 +193,6 @@ function TicketAnalysisSection() {
         return
       }
 
-      // Map to the format expected by the AI API
       const ticketsForRecap = cached.map((t: any) => ({
         id: t.ticket_id,
         subject: t.subject,
@@ -263,7 +207,6 @@ function TicketAnalysisSection() {
         messageCount: t.message_count || 0,
       }))
 
-      // Call AI
       const res = await fetch("/api/ai/ticket-recap", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -301,22 +244,13 @@ function TicketAnalysisSection() {
           Analyse Messages
         </h2>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSync}
-            disabled={syncing}
-            className="gap-2 text-xs h-7"
-          >
+          <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing} className="gap-2 text-xs h-7">
             <RefreshCw className={cn("h-3.5 w-3.5", syncing && "animate-spin")} />
             {syncing ? "Sync..." : "Sync tickets"}
           </Button>
           <Button
-            variant="outline"
-            size="sm"
-            onClick={handleLearn}
-            disabled={learning || syncing}
-            className="gap-2 text-xs h-7 border-gdl-purple text-gdl-purple hover:bg-gdl-purple hover:text-white"
+            variant="outline" size="sm" onClick={handleLearn} disabled={learning || syncing}
+            className="gap-2 text-xs h-7 border-[#007AFF] text-[#007AFF] hover:bg-[#007AFF] hover:text-white"
           >
             {learning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
             {learning ? "Apprentissage..." : "Apprendre"}
@@ -331,7 +265,6 @@ function TicketAnalysisSection() {
       </div>
 
       <div className="p-5">
-        {/* Period selector */}
         <div className="flex flex-wrap items-end gap-3 mb-4">
           <div className="flex gap-1.5">
             {(Object.keys(PERIOD_LABELS) as AnalysisPeriod[]).map((p) => (
@@ -340,9 +273,7 @@ function TicketAnalysisSection() {
                 onClick={() => setPeriod(p)}
                 className={cn(
                   "px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors",
-                  period === p
-                    ? "bg-[#007AFF] text-white"
-                    : "bg-[#F5F5F5] text-muted-foreground hover:bg-[#E9E9EB]"
+                  period === p ? "bg-[#007AFF] text-white" : "bg-[#F5F5F5] text-muted-foreground hover:bg-[#E9E9EB]"
                 )}
               >
                 {PERIOD_LABELS[p]}
@@ -352,38 +283,20 @@ function TicketAnalysisSection() {
 
           {period === "custom" && (
             <div className="flex items-center gap-2">
-              <input
-                type="date"
-                value={customFrom}
-                onChange={(e) => setCustomFrom(e.target.value)}
-                className="h-8 px-2 text-[12px] border border-border rounded-md bg-background"
-              />
-              <span className="text-xs text-muted-foreground">→</span>
-              <input
-                type="date"
-                value={customTo}
-                onChange={(e) => setCustomTo(e.target.value)}
-                className="h-8 px-2 text-[12px] border border-border rounded-md bg-background"
-              />
+              <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
+                className="h-8 px-2 text-[12px] border border-border rounded-md bg-background" />
+              <span className="text-xs text-muted-foreground">&rarr;</span>
+              <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
+                className="h-8 px-2 text-[12px] border border-border rounded-md bg-background" />
             </div>
           )}
 
-          <Button
-            onClick={handleAnalyze}
-            disabled={analyzing}
-            size="sm"
-            className="bg-[#007AFF] text-white hover:bg-[#007AFF]/90 gap-2 h-8"
-          >
-            {analyzing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Sparkles className="h-3.5 w-3.5" />
-            )}
+          <Button onClick={handleAnalyze} disabled={analyzing} size="sm" className="bg-[#007AFF] text-white hover:bg-[#007AFF]/90 gap-2 h-8">
+            {analyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
             {analyzing ? "Analyse en cours..." : "Analyser"}
           </Button>
         </div>
 
-        {/* Result */}
         {analyzing && (
           <div className="flex items-center gap-3 py-8 justify-center text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
@@ -430,7 +343,7 @@ function TicketAnalysisSection() {
               <p className="text-[10px] text-muted-foreground/60 mt-2">Dernière sync : {lastSync}</p>
             )}
             {learnResult && (
-              <p className="text-[10px] text-gdl-purple mt-1">{learnResult}</p>
+              <p className="text-[10px] text-[#007AFF] mt-1">{learnResult}</p>
             )}
           </div>
         )}
@@ -446,27 +359,18 @@ export default function DashboardPage() {
 
   // Shipping state
   const [shippingData, setShippingData] = useState<ShippingResponse | null>(null)
-  const [formsCount, setFormsCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
-  // SAV state
-  const [criticalReviews, setCriticalReviews] = useState<CriticalReview[]>([])
-  const [criticalLoading, setCriticalLoading] = useState(true)
-  const [reviewStatuses, setReviewStatuses] = useState<Record<string, { status: ReviewStatusType }>>({})
-  const [analyses, setAnalyses] = useState<Record<string, ReviewAnalysis>>({})
-  const [analyzing, setAnalyzing] = useState(false)
-  const [statusFilter, setStatusFilter] = useState<"all" | ReviewStatusType>("all")
+  // Ticket KPIs
+  const [ticketKpis, setTicketKpis] = useState<{
+    openCount: number; unreadCount: number; todayCount: number; weekCount: number
+  } | null>(null)
+  const [avgResponseTime, setAvgResponseTime] = useState<number | null>(null)
 
   // AI summary
   const [aiSummary, setAiSummary] = useState<string | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
-
-  // Email dialog
-  const [emailDialog, setEmailDialog] = useState<{
-    open: boolean; customerName: string | null; customerEmail: string | null
-    rating: number; feedback: string | null; submissionDate: string; formName: string
-  }>({ open: false, customerName: null, customerEmail: null, rating: 1, feedback: null, submissionDate: "", formName: "" })
 
   // ─── Data fetching ───
 
@@ -487,47 +391,66 @@ export default function DashboardPage() {
     const withTimeout = (promise: Promise<Response>, ms: number) =>
       Promise.race([promise, new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))])
 
-    const [shippingResult, formsResult] = await Promise.allSettled([
-      withTimeout(fetch(`/api/shipping?thresholdFR=${thresholdFR}&thresholdBE=${thresholdBE}`), 15000),
-      withTimeout(fetch("/api/fillout/forms"), 15000),
-    ])
-
-    if (shippingResult.status === "fulfilled" && shippingResult.value.ok) {
-      setShippingData(await shippingResult.value.json())
-    }
-    if (formsResult.status === "fulfilled" && formsResult.value.ok) {
-      const data = await formsResult.value.json()
-      setFormsCount(data.forms?.filter((f: { isPublished: boolean }) => f.isPublished).length ?? 0)
-    }
+    const res = await withTimeout(fetch(`/api/shipping?thresholdFR=${thresholdFR}&thresholdBE=${thresholdBE}`), 15000)
+    if (res.ok) setShippingData(await res.json())
   }, [supabase])
 
-  const fetchCritical = useCallback(async () => {
+  const fetchTicketKpis = useCallback(async () => {
     try {
-      const res = await fetch("/api/sav/critical")
+      // Fetch tickets from Gorgias
+      const res = await fetch("/api/gorgias/tickets")
+      if (!res.ok) return
+      const data = await res.json()
+      const tickets: GorgiasTicket[] = data.tickets || data || []
+
+      const openTickets = tickets.filter(t => t.status === "open")
+      const now = new Date()
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const day = now.getDay()
+      const diff = day === 0 ? 6 : day - 1
+      const startOfWeek = new Date(now)
+      startOfWeek.setDate(now.getDate() - diff)
+      startOfWeek.setHours(0, 0, 0, 0)
+
+      const todayCount = openTickets.filter(t => new Date(t.created_datetime) >= startOfDay).length
+      const weekCount = openTickets.filter(t => new Date(t.created_datetime) >= startOfWeek).length
+
+      // Get unread count from Supabase
+      const { data: { user } } = await supabase.auth.getUser()
+      let unreadCount = openTickets.length
+      if (user) {
+        const { data: readRows } = await supabase
+          .from("ticket_read_status")
+          .select("ticket_id")
+          .eq("user_id", user.id)
+        if (readRows) {
+          const readSet = new Set(readRows.map((r: { ticket_id: number }) => r.ticket_id))
+          unreadCount = openTickets.filter(t => !readSet.has(t.id)).length
+        }
+      }
+
+      setTicketKpis({ openCount: openTickets.length, unreadCount, todayCount, weekCount })
+    } catch { /* silent */ }
+  }, [supabase])
+
+  const fetchResponseTime = useCallback(async () => {
+    try {
+      const res = await fetch("/api/analytics/response-time?period=week")
       if (res.ok) {
         const data = await res.json()
-        setCriticalReviews(data.reviews || [])
+        setAvgResponseTime(data.avgMinutes)
       }
     } catch { /* silent */ }
   }, [])
 
   useEffect(() => {
     setLoading(true)
-    setCriticalLoading(true)
-    getReviewStatuses(supabase).then(setReviewStatuses)
-
-    // Load cached analyses
-    try {
-      const cached = localStorage.getItem("gdl-ai-analyses")
-      if (cached) setAnalyses(JSON.parse(cached))
-    } catch { /* ignore */ }
 
     // Load cached AI summary
     try {
       const cached = localStorage.getItem("gdl-ai-summary")
       if (cached) {
         const { summary, timestamp } = JSON.parse(cached)
-        // Show cached summary if less than 24h old
         if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
           setAiSummary(summary)
         }
@@ -535,82 +458,43 @@ export default function DashboardPage() {
     } catch { /* ignore */ }
 
     Promise.all([
-      fetchShipping().finally(() => setLoading(false)),
-      fetchCritical().finally(() => setCriticalLoading(false)),
-    ])
-  }, [fetchShipping, fetchCritical, supabase])
+      fetchShipping(),
+      fetchTicketKpis(),
+      fetchResponseTime(),
+    ]).finally(() => setLoading(false))
+  }, [fetchShipping, fetchTicketKpis, fetchResponseTime])
 
   async function handleRefresh() {
     setRefreshing(true)
-    await Promise.all([fetchShipping(), fetchCritical()])
-    setReviewStatuses(await getReviewStatuses(supabase))
+    await Promise.all([fetchShipping(), fetchTicketKpis(), fetchResponseTime()])
     setRefreshing(false)
-  }
-
-  // ─── Status management ───
-
-  async function handleStatusChange(submissionId: string, newStatus: ReviewStatusType) {
-    await setReviewStatus(supabase, submissionId, newStatus)
-    setReviewStatuses(await getReviewStatuses(supabase))
-  }
-
-  async function cycleStatus(submissionId: string) {
-    const current = reviewStatuses[submissionId]?.status ?? "new"
-    const next: ReviewStatusType = current === "new" ? "contacted" : current === "contacted" ? "resolved" : "new"
-    await handleStatusChange(submissionId, next)
-  }
-
-  // ─── AI Analysis ───
-
-  async function handleAnalyze() {
-    if (criticalReviews.length === 0) return
-    setAnalyzing(true)
-    try {
-      const res = await fetch("/api/ai/analyze-reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reviews: criticalReviews.slice(0, 50).map((r) => ({
-            submissionId: r.submissionId,
-            rating: r.rating,
-            feedback: r.feedback,
-            customerName: r.customerName,
-            submissionDate: r.submissionDate,
-            formName: r.formName,
-          })),
-        }),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        const map: Record<string, ReviewAnalysis> = {}
-        for (const a of data.analyses) map[a.submissionId] = a
-        setAnalyses(map)
-        localStorage.setItem("gdl-ai-analyses", JSON.stringify(map))
-      }
-    } catch { /* silent */ }
-    setAnalyzing(false)
   }
 
   async function handleWeeklySummary() {
     setSummaryLoading(true)
     try {
-      // Calculate avg rating from critical reviews (we only have critical ones, but show the data)
-      const ratings = criticalReviews.map((r) => r.rating)
-      const avg = ratings.length > 0 ? ratings.reduce((s, v) => s + v, 0) / ratings.length : null
+      // Use ticket_cache data for the summary instead of reviews
+      const { data: cachedTickets } = await supabase
+        .from("ticket_cache")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(30)
+
+      const ticketsForSummary = (cachedTickets || []).map((t: any) => ({
+        rating: 3, // No rating for tickets, use neutral
+        feedback: t.first_message || t.subject || "",
+        formName: "Gorgias",
+        submissionDate: t.created_at,
+        category: t.subject?.toLowerCase().includes("livraison") ? "livraison" : "autre",
+      }))
 
       const res = await fetch("/api/ai/weekly-summary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          reviews: criticalReviews.slice(0, 30).map((r) => ({
-            rating: r.rating,
-            feedback: r.feedback,
-            formName: r.formName,
-            submissionDate: r.submissionDate,
-            category: analyses[r.submissionId]?.category,
-          })),
-          totalReviews: criticalReviews.length,
-          avgRating: avg,
+          reviews: ticketsForSummary,
+          totalReviews: ticketsForSummary.length,
+          avgRating: null,
         }),
       })
       if (res.ok) {
@@ -627,28 +511,6 @@ export default function DashboardPage() {
   const stats = shippingData?.stats ?? { total: 0, delayed: 0, inTransit: 0, delivered: 0 }
   const delayedOrders = shippingData?.orders.filter((o) => o.alertLevel === "delayed").slice(0, 5) ?? []
 
-  const untreatedCount = criticalReviews.filter((r) => {
-    const s = reviewStatuses[r.submissionId]?.status
-    return !s || s === "new"
-  }).length
-
-  const filteredReviews = useMemo(() => {
-    let list = criticalReviews
-    if (statusFilter !== "all") {
-      list = list.filter((r) => {
-        const s = reviewStatuses[r.submissionId]?.status ?? "new"
-        return s === statusFilter
-      })
-    }
-    // Sort by urgency (if analyzed) then by date
-    return [...list].sort((a, b) => {
-      const ua = analyses[a.submissionId]?.urgency ?? 0
-      const ub = analyses[b.submissionId]?.urgency ?? 0
-      if (ua !== ub) return ub - ua
-      return new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime()
-    })
-  }, [criticalReviews, statusFilter, reviewStatuses, analyses])
-
   const chartData = [
     { name: "Retards", value: stats.delayed, fill: "#C70A24" },
     { name: "En transit", value: stats.inTransit, fill: "#E67C00" },
@@ -657,7 +519,7 @@ export default function DashboardPage() {
 
   // ─── Render ───
 
-  if (loading && criticalLoading) {
+  if (loading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-64" />
@@ -676,7 +538,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-xl font-semibold">Dashboard SAV</h1>
           <p className="text-[13px] text-muted-foreground mt-0.5">
-            Graine de Lascars — Vue d&apos;ensemble
+            Graine de Lascars &mdash; Vue d&apos;ensemble
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2">
@@ -685,14 +547,30 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards — 80% messages, 20% shipping */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
-          label="Avis critiques"
-          value={untreatedCount}
-          subtitle={`${criticalReviews.length} total · ${untreatedCount} non traités`}
-          icon={AlertTriangle}
+          label="Tickets ouverts"
+          value={ticketKpis?.openCount ?? "..."}
+          subtitle={`${ticketKpis?.todayCount ?? 0} aujourd'hui · ${ticketKpis?.weekCount ?? 0} cette semaine`}
+          icon={MessageSquare}
+          color="#007AFF"
+          href="/messages"
+        />
+        <KpiCard
+          label="Non lus"
+          value={ticketKpis?.unreadCount ?? "..."}
+          subtitle="Tickets à traiter"
+          icon={Mail}
           color="#C70A24"
+          href="/messages"
+        />
+        <KpiCard
+          label="Temps de réponse"
+          value={avgResponseTime != null ? formatDuration(avgResponseTime) : "..."}
+          subtitle="Moyenne cette semaine"
+          icon={Clock}
+          color="#047B5D"
         />
         <KpiCard
           label="Retards livraison"
@@ -702,253 +580,12 @@ export default function DashboardPage() {
           color="#E67C00"
           href="/shipping"
         />
-        <KpiCard
-          label="En transit"
-          value={stats.inTransit}
-          subtitle={`${stats.delivered} livrés`}
-          icon={TrendingUp}
-          color="#005BD3"
-          href="/shipping"
-        />
-        <KpiCard
-          label="Formulaires"
-          value={formsCount}
-          subtitle="Fillout publiés"
-          icon={FileText}
-          color="#047B5D"
-          href="/forms"
-        />
       </div>
 
-      {/* ═══ SAV Queue ═══ */}
-      <div className="rounded-lg border border-border bg-card shadow-[0_1px_0_0_rgba(0,0,0,.05)]">
-        <div className="px-5 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-[#FEE8EB]">
-              <AlertTriangle className="h-4 w-4 text-[#C70A24]" />
-            </div>
-            <div>
-              <h2 className="text-[13px] font-semibold">File d&apos;attente SAV</h2>
-              <p className="text-[11px] text-muted-foreground">{criticalReviews.length} avis critiques · cliquer sur le statut pour changer</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Status filter */}
-            <div className="flex items-center border border-border rounded-lg overflow-hidden bg-card h-8">
-              {([
-                ["all", "Tous", null],
-                ["new", "Nouveaux", "#C70A24"],
-                ["contacted", "Contactés", "#8A6116"],
-                ["resolved", "Résolus", "#047B5D"],
-              ] as const).map(([key, label, color]) => (
-                <button
-                  key={key}
-                  onClick={() => setStatusFilter(key as typeof statusFilter)}
-                  className={cn(
-                    "h-full px-2.5 text-[11px] font-medium transition-colors border-r border-border last:border-r-0 flex items-center gap-1",
-                    statusFilter === key ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/50"
-                  )}
-                >
-                  {color && <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />}
-                  {key === "all" && <Filter className="h-3 w-3" />}
-                  {label}
-                </button>
-              ))}
-            </div>
-            {/* AI Analyze button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleAnalyze}
-              disabled={analyzing || criticalReviews.length === 0}
-              className="gap-1.5 h-8 text-[11px] border-gdl-purple text-gdl-purple hover:bg-gdl-purple hover:text-white"
-            >
-              {analyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              {analyzing ? "Analyse..." : Object.keys(analyses).length > 0 ? "Re-analyser" : "Analyser (IA)"}
-            </Button>
-          </div>
-        </div>
-
-        {/* Queue list */}
-        {criticalLoading ? (
-          <div className="p-8 text-center">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">Chargement des avis critiques...</p>
-          </div>
-        ) : filteredReviews.length === 0 ? (
-          <div className="p-8 text-center">
-            <div className="w-10 h-10 rounded-full bg-[#CDFED4] flex items-center justify-center mx-auto mb-3">
-              <CheckCircle2 className="h-5 w-5 text-[#047B5D]" />
-            </div>
-            <p className="text-sm font-medium">
-              {statusFilter === "all" ? "Aucun avis critique" : `Aucun avis "${STATUS_CONFIG[statusFilter as ReviewStatusType]?.label ?? statusFilter}"`}
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-border max-h-[600px] overflow-y-auto">
-            {filteredReviews.map((review) => {
-              const status = reviewStatuses[review.submissionId]?.status ?? "new"
-              const analysis = analyses[review.submissionId]
-              const isRecent = Date.now() - new Date(review.submissionDate).getTime() < 14 * 24 * 60 * 60 * 1000
-
-              return (
-                <div key={review.submissionId} className={cn(
-                  "px-5 py-3.5 flex items-start gap-3 transition-colors",
-                  status === "resolved" ? "opacity-60" : "hover:bg-secondary/30"
-                )}>
-                  {/* Urgency indicator */}
-                  {analysis && (
-                    <div className={cn(
-                      "shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[12px] font-bold text-white",
-                      analysis.urgency >= 8 ? "bg-[#C70A24]" : analysis.urgency >= 5 ? "bg-[#E67C00]" : "bg-[#D97706]"
-                    )}>
-                      {analysis.urgency}
-                    </div>
-                  )}
-
-                  {/* Rating badge */}
-                  <div className={cn(
-                    "shrink-0 w-8 h-8 rounded-lg flex items-center justify-center font-bold text-[12px]",
-                    review.rating <= 2 ? "bg-[#FEE8EB] text-[#C70A24]" : "bg-[#FFF1E3] text-[#8A6116]"
-                  )}>
-                    {review.rating}/5
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                      <StatusBadge status={status} onClick={() => cycleStatus(review.submissionId)} />
-                      {analysis && <CategoryTag category={analysis.category} />}
-                      {isRecent && (
-                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#EAF4FF] text-[#005BD3]">Récent</span>
-                      )}
-                      <span className="text-[11px] text-muted-foreground ml-auto">
-                        {new Date(review.submissionDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 mb-0.5">
-                      {review.customerName && <span className="text-[13px] font-medium">{review.customerName}</span>}
-                      {review.email && (
-                        <span className="text-[12px] text-muted-foreground truncate">{review.email}</span>
-                      )}
-                      <span className="text-[11px] text-muted-foreground">· {review.formName}</span>
-                    </div>
-                    {review.feedback && (
-                      <p className="text-[12px] text-muted-foreground line-clamp-1">&ldquo;{review.feedback}&rdquo;</p>
-                    )}
-                    {analysis?.suggestedAction && (
-                      <p className="text-[11px] text-gdl-purple mt-0.5 flex items-center gap-1">
-                        <Sparkles className="h-3 w-3 shrink-0" />
-                        {analysis.suggestedAction}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={() => setEmailDialog({
-                        open: true,
-                        customerName: review.customerName,
-                        customerEmail: review.email,
-                        rating: review.rating,
-                        feedback: review.feedback,
-                        submissionDate: review.submissionDate,
-                        formName: review.formName,
-                      })}
-                      className="p-1.5 rounded-md text-white bg-gdl-purple hover:bg-[#005FCC] transition-colors"
-                      title="Générer email IA"
-                    >
-                      <Sparkles className="h-3.5 w-3.5" />
-                    </button>
-                    {review.email && (
-                      <a
-                        href={`mailto:${review.email}`}
-                        className="p-1.5 rounded-md text-muted-foreground hover:text-gdl-purple hover:bg-[#EAF3FF] transition-colors"
-                        title="Email direct"
-                      >
-                        <Mail className="h-3.5 w-3.5" />
-                      </a>
-                    )}
-                    {review.email && (
-                      <a
-                        href={`https://admin.shopify.com/store/grainedelascars/customers?query=${encodeURIComponent(review.email)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                        title="Shopify"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                    )}
-                    <Link
-                      href={`/forms/${review.formId}`}
-                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                      title="Voir le formulaire"
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                    </Link>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* ═══ Two-column: AI Summary + Shipping ═══ */}
+      {/* Two-column: SAV Trends + Shipping overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* AI Weekly Summary */}
-        <div className="rounded-lg border border-border bg-card p-5 shadow-[0_1px_0_0_rgba(0,0,0,.05)]">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-[13px] font-semibold flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-gdl-purple" />
-              Résumé IA
-            </h2>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleWeeklySummary}
-              disabled={summaryLoading || criticalReviews.length === 0}
-              className="gap-1.5 h-7 text-[11px]"
-            >
-              {summaryLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-              {aiSummary ? "Actualiser" : "Générer"}
-            </Button>
-          </div>
-          {summaryLoading ? (
-            <div className="flex flex-col items-center justify-center py-8 gap-2">
-              <Loader2 className="h-5 w-5 animate-spin text-gdl-purple" />
-              <p className="text-[12px] text-muted-foreground">Claude analyse vos données...</p>
-            </div>
-          ) : aiSummary ? (
-            <div className="prose prose-sm max-w-none text-[13px] text-foreground leading-relaxed [&_strong]:text-foreground [&_p]:mb-2 [&_ol]:pl-4 [&_ul]:pl-4 [&_li]:mb-1">
-              {aiSummary.split("\n").map((line, i) => {
-                if (line.startsWith("**") && line.endsWith("**")) {
-                  return <p key={i} className="font-semibold text-foreground mt-3 first:mt-0">{line.replace(/\*\*/g, "")}</p>
-                }
-                if (line.startsWith("- ")) {
-                  return <p key={i} className="text-muted-foreground pl-3 border-l-2 border-border">{line.slice(2)}</p>
-                }
-                if (line.match(/^\d+\./)) {
-                  return <p key={i} className="text-foreground">{line}</p>
-                }
-                if (line.trim() === "") return null
-                return <p key={i}>{line}</p>
-              })}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="w-10 h-10 rounded-full bg-[#EAF3FF] flex items-center justify-center mb-3">
-                <Sparkles className="h-5 w-5 text-gdl-purple" />
-              </div>
-              <p className="text-sm font-medium">Résumé IA hebdomadaire</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Claude analysera vos avis et identifiera les tendances
-              </p>
-            </div>
-          )}
-        </div>
+        {/* SAV Trends Chart */}
+        <SavTrendsChart />
 
         {/* Shipping overview */}
         <div className="rounded-lg border border-border bg-card p-5 shadow-[0_1px_0_0_rgba(0,0,0,.05)]">
@@ -958,14 +595,13 @@ export default function DashboardPage() {
               Livraisons en retard
             </h2>
             {delayedOrders.length > 0 && (
-              <Link href="/shipping" className="text-xs text-[#005BD3] hover:underline flex items-center gap-1">
+              <Link href="/shipping" className="text-xs text-[#007AFF] hover:underline flex items-center gap-1">
                 Voir tout <ArrowRight className="h-3 w-3" />
               </Link>
             )}
           </div>
           {stats.total > 0 ? (
             <div className="space-y-4">
-              {/* Mini chart */}
               <ResponsiveContainer width="100%" height={80}>
                 <BarChart data={chartData} layout="vertical" margin={{ left: 0, right: 16 }}>
                   <XAxis type="number" hide />
@@ -979,7 +615,6 @@ export default function DashboardPage() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-              {/* Delayed list */}
               {delayedOrders.length > 0 && (
                 <div className="space-y-0">
                   {delayedOrders.map((order) => {
@@ -994,8 +629,7 @@ export default function DashboardPage() {
                         </Badge>
                         <a
                           href={`https://admin.shopify.com/store/grainedelascars/orders/${shopifyNumericId}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          target="_blank" rel="noopener noreferrer"
                           className="text-muted-foreground hover:text-foreground"
                         >
                           <ExternalLink className="h-3 w-3" />
@@ -1018,20 +652,54 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Analyse Messages IA */}
-      <TicketAnalysisSection />
+      {/* AI Weekly Summary */}
+      <div className="rounded-lg border border-border bg-card p-5 shadow-[0_1px_0_0_rgba(0,0,0,.05)]">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-[13px] font-semibold flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-[#007AFF]" />
+            Résumé IA
+          </h2>
+          <Button variant="outline" size="sm" onClick={handleWeeklySummary} disabled={summaryLoading} className="gap-1.5 h-7 text-[11px]">
+            {summaryLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+            {aiSummary ? "Actualiser" : "Générer"}
+          </Button>
+        </div>
+        {summaryLoading ? (
+          <div className="flex flex-col items-center justify-center py-8 gap-2">
+            <Loader2 className="h-5 w-5 animate-spin text-[#007AFF]" />
+            <p className="text-[12px] text-muted-foreground">Claude analyse vos données...</p>
+          </div>
+        ) : aiSummary ? (
+          <div className="prose prose-sm max-w-none text-[13px] text-foreground leading-relaxed [&_strong]:text-foreground [&_p]:mb-2 [&_ol]:pl-4 [&_ul]:pl-4 [&_li]:mb-1">
+            {aiSummary.split("\n").map((line, i) => {
+              if (line.startsWith("**") && line.endsWith("**")) {
+                return <p key={i} className="font-semibold text-foreground mt-3 first:mt-0">{line.replace(/\*\*/g, "")}</p>
+              }
+              if (line.startsWith("- ")) {
+                return <p key={i} className="text-muted-foreground pl-3 border-l-2 border-border">{line.slice(2)}</p>
+              }
+              if (line.match(/^\d+\./)) {
+                return <p key={i} className="text-foreground">{line}</p>
+              }
+              if (line.trim() === "") return null
+              return <p key={i}>{line}</p>
+            })}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="w-10 h-10 rounded-full bg-[#EAF3FF] flex items-center justify-center mb-3">
+              <Sparkles className="h-5 w-5 text-[#007AFF]" />
+            </div>
+            <p className="text-sm font-medium">Résumé IA hebdomadaire</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Claude analysera vos tickets et identifiera les tendances
+            </p>
+          </div>
+        )}
+      </div>
 
-      {/* Email Dialog */}
-      <GenerateEmailDialog
-        open={emailDialog.open}
-        onClose={() => setEmailDialog((prev) => ({ ...prev, open: false }))}
-        customerName={emailDialog.customerName}
-        customerEmail={emailDialog.customerEmail}
-        rating={emailDialog.rating}
-        feedback={emailDialog.feedback}
-        formName={emailDialog.formName}
-        submissionDate={emailDialog.submissionDate}
-      />
+      {/* Ticket Analysis Section */}
+      <TicketAnalysisSection />
     </div>
   )
 }

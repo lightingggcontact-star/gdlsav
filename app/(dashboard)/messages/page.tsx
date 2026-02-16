@@ -37,7 +37,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { ComposeEmailDialog } from "@/components/compose-email-dialog"
+import { QuickReplyPicker } from "@/components/quick-reply-picker"
 import { useSupabase } from "@/lib/supabase/use-supabase"
+import { useRealtimeTickets } from "@/lib/use-realtime-tickets"
+import { playNotificationSound, requestNotificationPermission, showDesktopNotification } from "@/lib/notification-sound"
 
 // ─── Types ───
 
@@ -421,6 +424,44 @@ export default function MessagesPage() {
     }
     loadFromSupabase()
   }, [supabase])
+
+  // Request browser notification permission on mount
+  useEffect(() => { requestNotificationPermission() }, [])
+
+  // Realtime sync — labels, replied status, new tickets
+  useRealtimeTickets({
+    supabase,
+    userId,
+    enabled: !ticketsLoading,
+    onLabelChange: (ticketId, label, eventType) => {
+      setTicketLabels(prev => {
+        const next = { ...prev }
+        if (eventType === "DELETE" || !label) delete next[ticketId]
+        else next[ticketId] = label as TicketLabel
+        return next
+      })
+    },
+    onRepliedStatusChange: (ticketId, _repliedByUserId, repliedAt) => {
+      toast.info(`Un collègue a répondu au ticket #${ticketId}`)
+      playNotificationSound()
+      setRepliedMap(prev => {
+        const next = new Map(prev)
+        next.set(ticketId, repliedAt)
+        return next
+      })
+    },
+    onNewTicketDetected: (count) => {
+      playNotificationSound()
+      toast(`${count} nouveau${count > 1 ? "x" : ""} ticket${count > 1 ? "s" : ""}`, {
+        description: "Cliquez pour rafraîchir",
+        action: { label: "Rafraîchir", onClick: () => fetchTickets() },
+      })
+      showDesktopNotification(
+        "GDL SAV",
+        `${count} nouveau${count > 1 ? "x" : ""} ticket${count > 1 ? "s" : ""} Gorgias`
+      )
+    },
+  })
 
   async function markAsRead(ticketId: number) {
     setReadIds(prev => {
@@ -2959,6 +3000,11 @@ export default function MessagesPage() {
                       {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                       {generating ? "Génération..." : "IA"}
                     </button>
+                    <QuickReplyPicker
+                      onSelect={(text) => { setReplyText(text); setSendSuccess(false) }}
+                      customerFirstName={selectedTicket?.customer?.name?.split(" ")[0] || ""}
+                      trackingUrl={customerOrders?.orders?.[0]?.trackingUrl || undefined}
+                    />
                     {replyText.trim() && (
                       <button
                         onClick={() => { navigator.clipboard.writeText(replyText); toast.success("Copié") }}

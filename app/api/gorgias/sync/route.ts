@@ -4,6 +4,17 @@ import { getGorgiasConfig, gorgiasFetch, fetchAllTickets } from "@/lib/gorgias"
 
 export const dynamic = "force-dynamic"
 
+function classifyTicket(subject: string | null, firstMessage: string): string {
+  const text = `${subject || ""} ${firstMessage}`.toLowerCase()
+  if (/colis|livraison|suivi|tracking|expédi|transporteur|retard|chrono|colissimo|la poste/.test(text)) return "livraison"
+  if (/rembours|avoir|annul/.test(text)) return "remboursement"
+  if (/endommagé|cassé|abîmé|qualité|goût|moisi|périmé/.test(text)) return "qualite"
+  if (/code promo|réduction|cashback|points|fidélité/.test(text)) return "promo_fidelite"
+  if (/retour|renvoi|échange/.test(text)) return "retour"
+  if (/question|renseignement|comment|quoi|quel/.test(text)) return "question"
+  return "autre"
+}
+
 function stripHtml(html: string): string {
   return html
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
@@ -48,11 +59,14 @@ export async function POST() {
     let synced = 0
     for (let i = 0; i < toSync.length; i += 10) {
       const batch = toSync.slice(i, i + 10)
-      const results = await Promise.all(
+
+      // Fetch messages once per ticket and build both cache + analysis rows
+      const batchData = await Promise.all(
         batch.map(async (ticket: any) => {
           let firstMessage = ""
           let lastMessage = ""
           let messageCount = 0
+          let firstReplyAt: string | null = null
 
           try {
             const res = await gorgiasFetch(
@@ -69,33 +83,54 @@ export async function POST() {
                 const last = msgs[msgs.length - 1]
                 lastMessage = (last.body_text || stripHtml(last.body_html || "")).slice(0, 500)
               }
+              // Find first agent reply for response time analytics
+              const firstAgentMsg = msgs.find((m: any) => m.from_agent)
+              if (firstAgentMsg) {
+                firstReplyAt = firstAgentMsg.created_datetime
+              }
             }
           } catch { /* skip */ }
 
+          const category = classifyTicket(ticket.subject, firstMessage)
+
           return {
-            ticket_id: ticket.id,
-            subject: ticket.subject || null,
-            status: ticket.status,
-            priority: ticket.priority || "normal",
-            customer_name: ticket.customer?.name || ticket.customer?.email || "?",
-            customer_email: ticket.customer?.email || "",
-            created_at: ticket.created_datetime,
-            updated_at: ticket.updated_datetime,
-            tags: (ticket.tags || []).map((t: any) => t.name),
-            first_message: firstMessage,
-            last_message: lastMessage,
-            message_count: messageCount,
+            cache: {
+              ticket_id: ticket.id,
+              subject: ticket.subject || null,
+              status: ticket.status,
+              priority: ticket.priority || "normal",
+              customer_name: ticket.customer?.name || ticket.customer?.email || "?",
+              customer_email: ticket.customer?.email || "",
+              created_at: ticket.created_datetime,
+              updated_at: ticket.updated_datetime,
+              tags: (ticket.tags || []).map((t: any) => t.name),
+              first_message: firstMessage,
+              last_message: lastMessage,
+              message_count: messageCount,
+            },
+            analysis: {
+              ticket_id: ticket.id,
+              category,
+              first_reply_at: firstReplyAt,
+              ticket_created_at: ticket.created_datetime,
+              analyzed_at: new Date().toISOString(),
+            },
           }
         })
       )
 
-      // Upsert into Supabase
+      // Upsert into ticket_cache
       const { error } = await supabase
         .from("ticket_cache")
-        .upsert(results, { onConflict: "ticket_id" })
-
+        .upsert(batchData.map(d => d.cache), { onConflict: "ticket_id" })
       if (error) console.error("Sync upsert error:", error.message)
-      synced += results.length
+
+      // Upsert into ticket_analysis_categories
+      await supabase
+        .from("ticket_analysis_categories")
+        .upsert(batchData.map(d => d.analysis), { onConflict: "ticket_id" })
+
+      synced += batchData.length
     }
 
     return NextResponse.json({
