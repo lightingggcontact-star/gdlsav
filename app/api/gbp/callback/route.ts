@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     const oauth2Client = new google.auth.OAuth2(
       clientId,
       clientSecret,
-      "https://gdl-sav.vercel.app/api/gbp/callback"
+      "https://gdlsavaaa.vercel.app/api/gbp/callback"
     )
 
     const authUrl = oauth2Client.generateAuthUrl({
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     const oauth2Client = new google.auth.OAuth2(
       clientId,
       clientSecret,
-      "https://gdl-sav.vercel.app/api/gbp/callback"
+      "https://gdlsavaaa.vercel.app/api/gbp/callback"
     )
 
     const { tokens } = await oauth2Client.getToken(code)
