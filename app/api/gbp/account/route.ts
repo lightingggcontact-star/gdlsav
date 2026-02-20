@@ -1,30 +1,26 @@
 // app/api/gbp/account/route.ts
-// GET — Infos du compte GBP + fiche "Graine de Lascars"
+// GET — Infos de la fiche "Graine de Lascars" via Google Places API
 
 import { NextResponse } from "next/server"
-import { getBusinessInfo, getLocationId } from "@/lib/gbp"
+import { findPlace, getBusinessInfo } from "@/lib/gbp"
 
 export const dynamic = "force-dynamic"
 
 export async function GET() {
   try {
-    const [location, businessInfo] = await Promise.all([
-      getLocationId(),
+    const [placeId, businessInfo] = await Promise.all([
+      findPlace(),
       getBusinessInfo(),
     ])
 
     return NextResponse.json({
-      accountId: location.accountId,
-      locationId: location.locationId,
-      locationName: location.locationName,
+      placeId,
       businessInfo,
     })
   } catch (error) {
     console.error("GBP account error:", error)
     const message =
-      error instanceof Error ? error.message : "Erreur Google Business Profile"
-    const status =
-      error instanceof Error && message.includes("403") ? 403 : 500
-    return NextResponse.json({ error: message }, { status })
+      error instanceof Error ? error.message : "Erreur Google Places API"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

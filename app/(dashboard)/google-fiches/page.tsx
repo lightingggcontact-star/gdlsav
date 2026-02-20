@@ -7,38 +7,20 @@ import {
   Phone,
   Globe,
   Clock,
-  Eye,
-  MousePointer,
-  Navigation,
-  PhoneCall,
   RefreshCw,
-  Send,
   ExternalLink,
   AlertCircle,
-  Search,
-  Map,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
-import { toast } from "sonner"
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts"
 
-// ─── Types (miroir de lib/gbp.ts) ──────────────────────
+// ─── Types (miroir de lib/gbp.ts — Places API) ─────
 
 interface BusinessInfo {
-  name: string
+  placeId: string
   title: string
   address: string
   phone: string
@@ -54,11 +36,10 @@ interface Review {
   reviewId: string
   name: string
   reviewer: { displayName: string; profilePhotoUrl: string | null }
-  starRating: string
+  rating: number
   comment: string | null
   createTime: string
-  updateTime: string
-  reviewReply: { comment: string; updateTime: string } | null
+  relativeTime: string
 }
 
 interface ReviewsSummary {
@@ -67,33 +48,7 @@ interface ReviewsSummary {
   ratingDistribution: Record<number, number>
 }
 
-interface PerformanceStats {
-  period: { start: string; end: string }
-  searchViews: number
-  mapsViews: number
-  websiteClicks: number
-  directionRequests: number
-  phoneCallClicks: number
-  totalViews: number
-  dailyBreakdown: {
-    date: string
-    searchViews: number
-    mapsViews: number
-    websiteClicks: number
-    directionRequests: number
-    phoneCallClicks: number
-  }[]
-}
-
-// ─── Helpers ────────────────────────────────────────────
-
-const STAR_MAP: Record<string, number> = {
-  ONE: 1,
-  TWO: 2,
-  THREE: 3,
-  FOUR: 4,
-  FIVE: 5,
-}
+// ─── Helpers ────────────────────────────────────────
 
 const DAY_NAMES: Record<string, string> = {
   MONDAY: "Lundi",
@@ -105,11 +60,8 @@ const DAY_NAMES: Record<string, string> = {
   SUNDAY: "Dimanche",
 }
 
-function starNum(rating: string): number {
-  return STAR_MAP[rating] ?? 0
-}
-
 function timeAgo(dateStr: string): string {
+  if (!dateStr) return ""
   const now = Date.now()
   const then = new Date(dateStr).getTime()
   const diffMs = now - then
@@ -123,7 +75,7 @@ function timeAgo(dateStr: string): string {
   return `Il y a ${diffYears} an${diffYears > 1 ? "s" : ""}`
 }
 
-// ─── Composants internes ────────────────────────────────
+// ─── Composants internes ────────────────────────────
 
 function StarRating({ rating, size = "sm" }: { rating: number; size?: "sm" | "md" }) {
   const cls = size === "md" ? "h-4 w-4" : "h-3.5 w-3.5"
@@ -200,7 +152,7 @@ function KpiCard({
   )
 }
 
-// ─── Page principale ────────────────────────────────────
+// ─── Page principale ────────────────────────────────
 
 export default function GoogleFichesPage() {
   const [loading, setLoading] = useState(true)
@@ -211,23 +163,16 @@ export default function GoogleFichesPage() {
   const [businessInfo, setBusinessInfo] = useState<BusinessInfo | null>(null)
   const [reviews, setReviews] = useState<Review[]>([])
   const [summary, setSummary] = useState<ReviewsSummary | null>(null)
-  const [performance, setPerformance] = useState<PerformanceStats | null>(null)
 
   // Filtres avis
   const [reviewFilter, setReviewFilter] = useState<string>("all")
 
-  // Réponse aux avis
-  const [replyingTo, setReplyingTo] = useState<string | null>(null)
-  const [replyText, setReplyText] = useState("")
-  const [replySending, setReplySending] = useState(false)
-
   const fetchData = useCallback(async () => {
     try {
       setError(null)
-      const [accountRes, reviewsRes, perfRes] = await Promise.all([
+      const [accountRes, reviewsRes] = await Promise.all([
         fetch("/api/gbp/account"),
         fetch("/api/gbp/reviews"),
-        fetch("/api/gbp/performance"),
       ])
 
       if (accountRes.ok) {
@@ -242,7 +187,7 @@ export default function GoogleFichesPage() {
         const data = await reviewsRes.json()
         setReviews(data.reviews ?? [])
         setSummary(data.summary ?? null)
-        // Enrichir businessInfo avec les stats des avis
+        // Enrichir businessInfo avec les stats globales
         if (data.summary) {
           setBusinessInfo((prev) =>
             prev
@@ -254,11 +199,6 @@ export default function GoogleFichesPage() {
               : prev
           )
         }
-      }
-
-      if (perfRes.ok) {
-        const data = await perfRes.json()
-        setPerformance(data)
       }
     } catch (err) {
       setError(
@@ -279,49 +219,14 @@ export default function GoogleFichesPage() {
     await fetchData()
   }
 
-  async function handleReply(reviewName: string, reviewId: string) {
-    if (!replyText.trim()) return
-    setReplySending(true)
-    try {
-      const res = await fetch(`/api/gbp/reviews/${reviewId}/reply`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reviewName, responseText: replyText.trim() }),
-      })
-
-      if (res.ok) {
-        toast.success("Réponse publiée avec succès")
-        setReplyingTo(null)
-        setReplyText("")
-        // Rafraîchir les avis
-        const reviewsRes = await fetch("/api/gbp/reviews")
-        if (reviewsRes.ok) {
-          const data = await reviewsRes.json()
-          setReviews(data.reviews ?? [])
-          setSummary(data.summary ?? null)
-        }
-      } else {
-        const data = await res.json().catch(() => null)
-        toast.error(data?.error ?? "Erreur lors de la réponse")
-      }
-    } catch {
-      toast.error("Erreur de connexion")
-    } finally {
-      setReplySending(false)
-    }
-  }
-
   // Filtrage des avis
   const filteredReviews = reviews.filter((r) => {
     if (reviewFilter === "all") return true
-    if (reviewFilter === "unanswered") return !r.reviewReply
     const num = parseInt(reviewFilter)
-    return starNum(r.starRating) === num
+    return r.rating === num
   })
 
-  const unansweredCount = reviews.filter((r) => !r.reviewReply).length
-
-  // ─── Loading state ────────────────────────────────────
+  // ─── Loading state ────────────────────────────────
   if (loading) {
     return (
       <div className="space-y-6">
@@ -342,7 +247,7 @@ export default function GoogleFichesPage() {
     )
   }
 
-  // ─── Error state (OAuth pas configuré) ────────────────
+  // ─── Error state ──────────────────────────────────
   if (error && !businessInfo) {
     return (
       <div className="space-y-6">
@@ -352,30 +257,17 @@ export default function GoogleFichesPage() {
             Fiche Google Business Profile
           </p>
         </div>
-        <div className="rounded-lg border border-[#E67C00] bg-[#FFF1E3] p-5">
+        <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-5">
           <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-[#E67C00] shrink-0 mt-0.5" />
+            <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
             <div>
-              <p className="text-[13px] font-semibold text-[#E67C00]">
-                Configuration OAuth requise
+              <p className="text-[13px] font-semibold text-destructive">
+                Erreur de connexion
               </p>
-              <p className="text-[13px] text-[#E67C00]/80 mt-1">{error}</p>
-              <p className="text-[12px] text-[#E67C00]/60 mt-2">
-                1. Va sur{" "}
-                <code className="bg-[#E67C00]/10 px-1 rounded">
-                  http://localhost:3000/api/gbp/callback
-                </code>{" "}
-                pour obtenir le lien d'autorisation
-                <br />
-                2. Autorise l'accès avec ton compte Google
-                <br />
-                3. Copie le refresh_token dans{" "}
-                <code className="bg-[#E67C00]/10 px-1 rounded">
-                  .env.local
-                </code>{" "}
-                (variable GOOGLE_REFRESH_TOKEN)
-                <br />
-                4. Redémarre le serveur
+              <p className="text-[13px] text-destructive/80 mt-1">{error}</p>
+              <p className="text-[12px] text-muted-foreground mt-2">
+                Vérifiez que la variable <code className="bg-muted px-1 rounded">GOOGLE_API_KEY</code> est bien
+                configurée dans les variables d'environnement.
               </p>
             </div>
           </div>
@@ -384,7 +276,7 @@ export default function GoogleFichesPage() {
     )
   }
 
-  // ─── Rendu principal ──────────────────────────────────
+  // ─── Rendu principal ──────────────────────────────
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -412,67 +304,53 @@ export default function GoogleFichesPage() {
       {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="overview">Vue d'ensemble</TabsTrigger>
+          <TabsTrigger value="overview">Vue d&apos;ensemble</TabsTrigger>
           <TabsTrigger value="reviews" className="gap-1.5">
             Avis
-            {unansweredCount > 0 && (
+            {summary && (
               <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#E67C00] text-white text-[10px] font-semibold flex items-center justify-center">
-                {unansweredCount}
+                {summary.totalReviews}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
         </TabsList>
 
         {/* ─── Tab : Vue d'ensemble ─── */}
         <TabsContent value="overview" className="space-y-4">
           {/* KPI Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             <KpiCard
               icon={Star}
               label="Note moyenne"
               value={
                 summary
                   ? `${summary.averageRating}/5`
-                  : "—"
+                  : businessInfo
+                    ? `${businessInfo.averageRating}/5`
+                    : "—"
               }
               sub={
                 summary
-                  ? `Sur ${summary.totalReviews} avis`
-                  : undefined
+                  ? `Sur ${summary.totalReviews} avis Google`
+                  : businessInfo
+                    ? `Sur ${businessInfo.totalReviews} avis Google`
+                    : undefined
               }
               color="#E67C00"
             />
             <KpiCard
-              icon={Eye}
-              label="Vues totales (30j)"
-              value={
-                performance
-                  ? performance.totalViews.toLocaleString("fr-FR")
-                  : "—"
-              }
-              sub="Recherche + Maps"
+              icon={MapPin}
+              label="Catégorie"
+              value={businessInfo?.category || "—"}
+              sub="Type d'activité"
               color="#007AFF"
             />
             <KpiCard
-              icon={MousePointer}
-              label="Clics site web (30j)"
-              value={
-                performance
-                  ? performance.websiteClicks.toLocaleString("fr-FR")
-                  : "—"
-              }
+              icon={Globe}
+              label="Site web"
+              value={businessInfo?.website ? "Actif" : "—"}
+              sub={businessInfo?.website || undefined}
               color="#047B5D"
-            />
-            <KpiCard
-              icon={PhoneCall}
-              label="Appels (30j)"
-              value={
-                performance
-                  ? performance.phoneCallClicks.toLocaleString("fr-FR")
-                  : "—"
-              }
-              color="#8B5CF6"
             />
           </div>
 
@@ -539,9 +417,9 @@ export default function GoogleFichesPage() {
                       </span>
                     </div>
                     <div className="space-y-1">
-                      {businessInfo.regularHours.map((h) => (
+                      {businessInfo.regularHours.map((h, idx) => (
                         <div
-                          key={h.day}
+                          key={`${h.day}-${idx}`}
                           className="flex items-center justify-between text-[12px]"
                         >
                           <span className="text-muted-foreground">
@@ -562,43 +440,22 @@ export default function GoogleFichesPage() {
           {/* Distribution des notes */}
           {summary && (
             <div className="rounded-lg border border-border bg-card p-5 shadow-[0_1px_0_0_rgba(0,0,0,.05)]">
-              <h2 className="text-[13px] font-semibold mb-3">
+              <h2 className="text-[13px] font-semibold mb-1">
                 Répartition des notes
               </h2>
+              <p className="text-[11px] text-muted-foreground mb-3">
+                Basée sur les {reviews.length} avis les plus pertinents
+              </p>
               <div className="space-y-2 max-w-md">
                 {[5, 4, 3, 2, 1].map((s) => (
                   <RatingBar
                     key={s}
                     star={s}
                     count={summary.ratingDistribution[s] ?? 0}
-                    total={summary.totalReviews}
+                    total={reviews.length}
                   />
                 ))}
               </div>
-            </div>
-          )}
-
-          {/* Alerte avis sans réponse */}
-          {unansweredCount > 0 && (
-            <div className="rounded-lg border border-[#E67C00] bg-[#FFF1E3] p-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-[#E67C00]" />
-                <span className="text-[13px] font-medium text-[#E67C00]">
-                  {unansweredCount} avis sans réponse
-                </span>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-[#E67C00] border-[#E67C00] hover:bg-[#E67C00]/10"
-                onClick={() => {
-                  const tabsEl = document.querySelector('[data-value="reviews"]') as HTMLElement
-                  tabsEl?.click()
-                  setReviewFilter("unanswered")
-                }}
-              >
-                Voir les avis
-              </Button>
             </div>
           )}
         </TabsContent>
@@ -609,7 +466,7 @@ export default function GoogleFichesPage() {
           {summary && (
             <div className="flex items-center gap-3 text-[13px] text-muted-foreground">
               <span className="font-medium text-foreground">
-                {summary.totalReviews} avis
+                {summary.totalReviews} avis au total
               </span>
               <span>·</span>
               <span className="flex items-center gap-1">
@@ -617,8 +474,8 @@ export default function GoogleFichesPage() {
                 {summary.averageRating}
               </span>
               <span>·</span>
-              <span className="text-[#E67C00] font-medium">
-                {unansweredCount} sans réponse
+              <span className="text-muted-foreground">
+                {reviews.length} avis affichés (les plus pertinents)
               </span>
             </div>
           )}
@@ -627,7 +484,6 @@ export default function GoogleFichesPage() {
           <div className="flex items-center gap-2 flex-wrap">
             {[
               { key: "all", label: "Tous" },
-              { key: "unanswered", label: "Sans réponse" },
               { key: "5", label: "5★" },
               { key: "4", label: "4★" },
               { key: "3", label: "3★" },
@@ -659,12 +515,7 @@ export default function GoogleFichesPage() {
             {filteredReviews.map((review) => (
               <div
                 key={review.reviewId}
-                className={cn(
-                  "rounded-lg border bg-card p-4 shadow-[0_1px_0_0_rgba(0,0,0,.05)]",
-                  !review.reviewReply
-                    ? "border-[#E67C00]/30"
-                    : "border-border"
-                )}
+                className="rounded-lg border border-border bg-card p-4 shadow-[0_1px_0_0_rgba(0,0,0,.05)]"
               >
                 {/* Header avis */}
                 <div className="flex items-center justify-between mb-2">
@@ -677,250 +528,46 @@ export default function GoogleFichesPage() {
                         {review.reviewer.displayName}
                       </p>
                       <p className="text-[11px] text-muted-foreground">
-                        {timeAgo(review.createTime)}
+                        {review.relativeTime || timeAgo(review.createTime)}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <StarRating rating={starNum(review.starRating)} />
-                    {!review.reviewReply && (
-                      <Badge
-                        variant="secondary"
-                        className="text-[10px] bg-[#FFF1E3] text-[#E67C00] border-[#E67C00]/20"
-                      >
-                        Sans réponse
-                      </Badge>
-                    )}
-                  </div>
+                  <StarRating rating={review.rating} />
                 </div>
 
                 {/* Texte de l'avis */}
                 {review.comment && (
-                  <p className="text-[13px] text-foreground/90 mb-3 leading-relaxed">
+                  <p className="text-[13px] text-foreground/90 leading-relaxed">
                     {review.comment}
                   </p>
                 )}
 
-                {/* Réponse existante */}
-                {review.reviewReply && (
-                  <div className="ml-4 pl-3 border-l-2 border-[#007AFF]/30 mt-2">
-                    <p className="text-[11px] font-medium text-[#007AFF] mb-1">
-                      Réponse du propriétaire
-                    </p>
-                    <p className="text-[12px] text-muted-foreground leading-relaxed">
-                      {review.reviewReply.comment}
-                    </p>
-                  </div>
-                )}
-
-                {/* Bouton / Formulaire de réponse */}
-                {!review.reviewReply && (
-                  <div className="mt-3">
-                    {replyingTo === review.reviewId ? (
-                      <div className="space-y-2">
-                        <Textarea
-                          placeholder="Votre réponse..."
-                          value={replyText}
-                          onChange={(e) => setReplyText(e.target.value)}
-                          className="text-[13px] min-h-[80px]"
-                        />
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() =>
-                              handleReply(review.name, review.reviewId)
-                            }
-                            disabled={replySending || !replyText.trim()}
-                            className="gap-1.5 bg-[#007AFF] hover:bg-[#0066DD]"
-                          >
-                            <Send className="h-3.5 w-3.5" />
-                            {replySending ? "Envoi..." : "Publier"}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setReplyingTo(null)
-                              setReplyText("")
-                            }}
-                          >
-                            Annuler
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-[12px] gap-1.5"
-                        onClick={() => {
-                          setReplyingTo(review.reviewId)
-                          setReplyText("")
-                        }}
-                      >
-                        <Send className="h-3 w-3" />
-                        Répondre
-                      </Button>
-                    )}
-                  </div>
+                {/* Pas de commentaire */}
+                {!review.comment && (
+                  <p className="text-[12px] text-muted-foreground italic">
+                    Avis sans commentaire
+                  </p>
                 )}
               </div>
             ))}
           </div>
-        </TabsContent>
 
-        {/* ─── Tab : Performance ─── */}
-        <TabsContent value="performance" className="space-y-4">
-          {performance ? (
-            <>
-              {/* Période */}
-              <p className="text-[12px] text-muted-foreground">
-                Période : {performance.period.start} → {performance.period.end}
-              </p>
-
-              {/* KPI Cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                <KpiCard
-                  icon={Search}
-                  label="Recherche Google"
-                  value={performance.searchViews.toLocaleString("fr-FR")}
-                  color="#007AFF"
-                />
-                <KpiCard
-                  icon={Map}
-                  label="Google Maps"
-                  value={performance.mapsViews.toLocaleString("fr-FR")}
-                  color="#047B5D"
-                />
-                <KpiCard
-                  icon={MousePointer}
-                  label="Clics site web"
-                  value={performance.websiteClicks.toLocaleString("fr-FR")}
-                  color="#8B5CF6"
-                />
-                <KpiCard
-                  icon={Navigation}
-                  label="Itinéraires"
-                  value={performance.directionRequests.toLocaleString("fr-FR")}
-                  color="#E67C00"
-                />
-                <KpiCard
-                  icon={PhoneCall}
-                  label="Appels"
-                  value={performance.phoneCallClicks.toLocaleString("fr-FR")}
-                  color="#C70A24"
-                />
-              </div>
-
-              {/* Graphique quotidien */}
-              {performance.dailyBreakdown.length > 0 && (
-                <div className="rounded-lg border border-border bg-card p-5 shadow-[0_1px_0_0_rgba(0,0,0,.05)]">
-                  <h2 className="text-[13px] font-semibold mb-4">
-                    Vues quotidiennes (30 jours)
-                  </h2>
-                  <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={performance.dailyBreakdown}
-                        margin={{ top: 5, right: 5, left: -10, bottom: 5 }}
-                      >
-                        <XAxis
-                          dataKey="date"
-                          tick={{ fontSize: 10 }}
-                          tickFormatter={(v: string) => v.slice(5)}
-                          interval="preserveStartEnd"
-                        />
-                        <YAxis tick={{ fontSize: 10 }} />
-                        <RechartsTooltip
-                          contentStyle={{
-                            fontSize: 12,
-                            borderRadius: 8,
-                            border: "1px solid var(--border)",
-                          }}
-                        />
-                        <Legend
-                          wrapperStyle={{ fontSize: 11 }}
-                          iconSize={8}
-                        />
-                        <Bar
-                          dataKey="searchViews"
-                          name="Recherche"
-                          fill="#007AFF"
-                          stackId="views"
-                          radius={[0, 0, 0, 0]}
-                        />
-                        <Bar
-                          dataKey="mapsViews"
-                          name="Maps"
-                          fill="#047B5D"
-                          stackId="views"
-                          radius={[2, 2, 0, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              )}
-
-              {/* Graphique actions */}
-              {performance.dailyBreakdown.length > 0 && (
-                <div className="rounded-lg border border-border bg-card p-5 shadow-[0_1px_0_0_rgba(0,0,0,.05)]">
-                  <h2 className="text-[13px] font-semibold mb-4">
-                    Actions quotidiennes (30 jours)
-                  </h2>
-                  <div className="h-[250px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={performance.dailyBreakdown}
-                        margin={{ top: 5, right: 5, left: -10, bottom: 5 }}
-                      >
-                        <XAxis
-                          dataKey="date"
-                          tick={{ fontSize: 10 }}
-                          tickFormatter={(v: string) => v.slice(5)}
-                          interval="preserveStartEnd"
-                        />
-                        <YAxis tick={{ fontSize: 10 }} />
-                        <RechartsTooltip
-                          contentStyle={{
-                            fontSize: 12,
-                            borderRadius: 8,
-                            border: "1px solid var(--border)",
-                          }}
-                        />
-                        <Legend
-                          wrapperStyle={{ fontSize: 11 }}
-                          iconSize={8}
-                        />
-                        <Bar
-                          dataKey="websiteClicks"
-                          name="Site web"
-                          fill="#8B5CF6"
-                          radius={[2, 2, 0, 0]}
-                        />
-                        <Bar
-                          dataKey="directionRequests"
-                          name="Itinéraires"
-                          fill="#E67C00"
-                          radius={[2, 2, 0, 0]}
-                        />
-                        <Bar
-                          dataKey="phoneCallClicks"
-                          name="Appels"
-                          fill="#C70A24"
-                          radius={[2, 2, 0, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-12 text-[13px] text-muted-foreground">
-              Aucune donnée de performance disponible.
-            </div>
-          )}
+          {/* Note de limitation */}
+          <div className="rounded-lg border border-border bg-muted/50 p-3 text-center">
+            <p className="text-[11px] text-muted-foreground">
+              L&apos;API Google Places affiche les 5 avis les plus pertinents.
+              Pour voir tous les avis, consultez votre{" "}
+              <a
+                href={businessInfo?.mapsUrl ?? "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#007AFF] hover:underline"
+              >
+                fiche Google Maps
+              </a>
+              .
+            </p>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
