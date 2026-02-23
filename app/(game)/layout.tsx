@@ -33,6 +33,8 @@ export default function GameLayout({
         <div className="smoke-wisp" />
         <div className="smoke-wisp" />
         <div className="smoke-wisp" />
+        <div className="smoke-wisp" />
+        <div className="smoke-wisp" />
       </div>
 
       {/* Top marquee ticker */}
