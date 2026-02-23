@@ -121,6 +121,7 @@ EXTRAIS UN JSON avec ce format exact (pas de markdown, juste le JSON) :
 }
 
 REGLES :
+- IGNORE les problemes de livraison/colis/suivi/tracking/retard — ils sont deja geres ailleurs. Concentre-toi sur les problemes PRODUIT, SERVICE, QUALITE, PRIX, COMMUNICATION, etc.
 - Pain points : entre 3 et 8, tries par frequence decroissante
 - Objections : entre 2 et 6, triees par frequence decroissante
 - Avis extremes : max 5 positifs et 5 negatifs, bases sur les VRAIS messages

@@ -11,8 +11,10 @@ import {
   ThumbsDown,
   AlertTriangle,
   Quote,
+  Send,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -264,6 +266,8 @@ export default function InsightsPage() {
   const [meta, setMeta] = useState<{ ticketsAnalyzed: number; generatedAt: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [emailTo, setEmailTo] = useState("")
+  const [sending, setSending] = useState(false)
 
   const periodKey = useMemo(() => getPeriodKey(period), [period])
 
@@ -373,6 +377,156 @@ export default function InsightsPage() {
     setGenerating(false)
   }
 
+  // ─── Send by email ───
+
+  function buildEmailHtml(data: InsightsData, periodLabel: string, ticketsCount: number): string {
+    const sevEmoji: Record<string, string> = { high: "🔴", medium: "🟠", low: "🔵" }
+
+    let html = `<div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;color:#1a1a1a">`
+    html += `<h1 style="font-size:20px;margin-bottom:4px">Rapport Insights SAV — ${periodLabel}</h1>`
+    html += `<p style="font-size:13px;color:#666;margin-top:0">${ticketsCount} tickets analyses — ${new Date().toLocaleDateString("fr-FR")}</p>`
+    html += `<hr style="border:none;border-top:1px solid #e3e3e3;margin:16px 0">`
+
+    // Pain points
+    if (data.pain_points.length > 0) {
+      html += `<h2 style="font-size:16px;margin-bottom:8px">Pain Points (${data.pain_points.length})</h2>`
+      for (const p of data.pain_points) {
+        html += `<div style="border:1px solid #e3e3e3;border-radius:8px;padding:12px;margin-bottom:8px">`
+        html += `<p style="margin:0 0 4px"><strong>${sevEmoji[p.severity] || ""} ${p.label}</strong> <span style="color:#666;font-size:12px">(${p.frequency}x)</span></p>`
+        html += `<p style="margin:0 0 6px;font-size:13px;color:#444">${p.description}</p>`
+        if (p.example_quote) {
+          html += `<p style="margin:0 0 6px;font-size:12px;color:#666;font-style:italic;border-left:3px solid #e3e3e3;padding-left:8px">"${p.example_quote}"</p>`
+        }
+        html += `<p style="margin:0;font-size:12px;color:#007AFF">💡 ${p.suggested_action}</p>`
+        html += `</div>`
+      }
+    }
+
+    // Objections
+    if (data.objections.length > 0) {
+      html += `<h2 style="font-size:16px;margin:20px 0 8px">Objections (${data.objections.length})</h2>`
+      for (const o of data.objections) {
+        html += `<div style="border:1px solid #e3e3e3;border-radius:8px;padding:12px;margin-bottom:8px">`
+        html += `<p style="margin:0 0 4px"><strong>${o.label}</strong> <span style="color:#666;font-size:12px">(${o.frequency}x)</span></p>`
+        html += `<p style="margin:0 0 6px;font-size:13px;color:#444">${o.description}</p>`
+        if (o.example_quote) {
+          html += `<p style="margin:0 0 6px;font-size:12px;color:#666;font-style:italic;border-left:3px solid #E67C00;padding-left:8px">"${o.example_quote}"</p>`
+        }
+        html += `<p style="margin:0;font-size:12px;color:#047B5D">💬 ${o.recommended_response}</p>`
+        html += `</div>`
+      }
+    }
+
+    // Extreme reviews
+    const pos = data.extreme_reviews.positive
+    const neg = data.extreme_reviews.negative
+    if (pos.length > 0 || neg.length > 0) {
+      html += `<h2 style="font-size:16px;margin:20px 0 8px">Avis Extremes</h2>`
+
+      if (pos.length > 0) {
+        html += `<h3 style="font-size:14px;color:#047B5D;margin-bottom:6px">👍 Ultra positifs</h3>`
+        for (const r of pos) {
+          html += `<div style="border-left:3px solid #047B5D;padding-left:10px;margin-bottom:10px">`
+          html += `<p style="margin:0;font-size:13px;font-style:italic">"${r.quote}"</p>`
+          html += `<p style="margin:2px 0 0;font-size:11px;color:#666">— ${r.customer_name} (${r.topic})</p>`
+          html += `</div>`
+        }
+      }
+
+      if (neg.length > 0) {
+        html += `<h3 style="font-size:14px;color:#C70A24;margin:12px 0 6px">👎 Ultra negatifs</h3>`
+        for (const r of neg) {
+          html += `<div style="border-left:3px solid #C70A24;padding-left:10px;margin-bottom:10px">`
+          html += `<p style="margin:0;font-size:13px;font-style:italic">"${r.quote}"</p>`
+          html += `<p style="margin:2px 0 0;font-size:11px;color:#666">— ${r.customer_name} (${r.topic})</p>`
+          html += `</div>`
+        }
+      }
+    }
+
+    html += `<hr style="border:none;border-top:1px solid #e3e3e3;margin:20px 0 10px">`
+    html += `<p style="font-size:11px;color:#999;margin:0">Genere par GDL SAV — Analyse IA</p>`
+    html += `</div>`
+    return html
+  }
+
+  function buildEmailText(data: InsightsData, periodLabel: string, ticketsCount: number): string {
+    let text = `RAPPORT INSIGHTS SAV — ${periodLabel}\n${ticketsCount} tickets analyses — ${new Date().toLocaleDateString("fr-FR")}\n\n`
+
+    if (data.pain_points.length > 0) {
+      text += `=== PAIN POINTS ===\n`
+      for (const p of data.pain_points) {
+        text += `\n• ${p.label} (${p.frequency}x, ${p.severity})\n  ${p.description}\n`
+        if (p.example_quote) text += `  "${p.example_quote}"\n`
+        text += `  → ${p.suggested_action}\n`
+      }
+    }
+
+    if (data.objections.length > 0) {
+      text += `\n=== OBJECTIONS ===\n`
+      for (const o of data.objections) {
+        text += `\n• ${o.label} (${o.frequency}x)\n  ${o.description}\n`
+        if (o.example_quote) text += `  "${o.example_quote}"\n`
+        text += `  → ${o.recommended_response}\n`
+      }
+    }
+
+    const pos = data.extreme_reviews.positive
+    const neg = data.extreme_reviews.negative
+    if (pos.length > 0 || neg.length > 0) {
+      text += `\n=== AVIS EXTREMES ===\n`
+      if (pos.length > 0) {
+        text += `\nPositifs:\n`
+        for (const r of pos) text += `  "${r.quote}" — ${r.customer_name}\n`
+      }
+      if (neg.length > 0) {
+        text += `\nNegatifs:\n`
+        for (const r of neg) text += `  "${r.quote}" — ${r.customer_name}\n`
+      }
+    }
+
+    return text
+  }
+
+  async function handleSendEmail() {
+    if (!insights || !emailTo.trim()) return
+    if (!emailTo.includes("@")) {
+      toast.error("Adresse email invalide")
+      return
+    }
+
+    setSending(true)
+    try {
+      const pLabel = getPeriodLabel(period)
+      const count = meta?.ticketsAnalyzed ?? 0
+      const bodyHtml = buildEmailHtml(insights, pLabel, count)
+      const bodyText = buildEmailText(insights, pLabel, count)
+
+      const res = await fetch("/api/gorgias/tickets/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerEmail: emailTo.trim(),
+          customerName: emailTo.trim(),
+          subject: `Rapport Insights SAV — ${pLabel}`,
+          bodyText,
+          bodyHtml,
+        }),
+      })
+
+      if (res.ok) {
+        toast.success(`Rapport envoye a ${emailTo.trim()}`)
+        setEmailTo("")
+      } else {
+        const err = await res.json()
+        toast.error(err.error || "Erreur d'envoi")
+      }
+    } catch {
+      toast.error("Erreur de connexion")
+    }
+    setSending(false)
+  }
+
   // ─── Chart data ───
 
   const painPointChartData = useMemo(() => {
@@ -422,15 +576,39 @@ export default function InsightsPage() {
             </p>
           )}
         </div>
-        <Button
-          onClick={handleGenerate}
-          disabled={generating}
-          size="sm"
-          className="gap-2 bg-[#007AFF] text-white hover:bg-[#007AFF]/90"
-        >
-          {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          {generating ? "Analyse en cours..." : insights ? "Regenerer" : "Generer"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {insights && (
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="email"
+                placeholder="Email du destinataire"
+                value={emailTo}
+                onChange={(e) => setEmailTo(e.target.value)}
+                className="h-8 w-48 text-[12px] bg-card"
+                onKeyDown={(e) => e.key === "Enter" && handleSendEmail()}
+              />
+              <Button
+                onClick={handleSendEmail}
+                disabled={sending || !emailTo.trim()}
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-8"
+              >
+                {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                Envoyer
+              </Button>
+            </div>
+          )}
+          <Button
+            onClick={handleGenerate}
+            disabled={generating}
+            size="sm"
+            className="gap-2 bg-[#007AFF] text-white hover:bg-[#007AFF]/90"
+          >
+            {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {generating ? "Analyse en cours..." : insights ? "Regenerer" : "Generer"}
+          </Button>
+        </div>
       </div>
 
       {/* Period selector */}
