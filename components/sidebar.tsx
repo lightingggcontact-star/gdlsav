@@ -14,6 +14,7 @@ import {
   MapPin,
   RotateCcw,
   Lightbulb,
+  Gamepad2,
 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { href: "/forms", label: "Formulaires", icon: FileText },
   { href: "/google-fiches", label: "Google Fiches", icon: MapPin },
   { href: "/insights", label: "Insights", icon: Lightbulb },
+  { href: "/jeu", label: "Jeu Fidélisation", icon: Gamepad2, separator: true },
   { href: "/settings", label: "Paramètres", icon: Settings },
 ]
 
@@ -148,6 +150,8 @@ export function Sidebar() {
             const badge = item.badgeKey === "delayed" ? delayedCount : item.badgeKey === "messages" ? openTicketsCount : 0
 
             return (
+              <div key={item.href}>
+              {"separator" in item && item.separator && <div className="mx-1 my-2 h-px bg-border" />}
               <Link
                 key={item.href}
                 href={item.href}
@@ -170,6 +174,7 @@ export function Sidebar() {
                   </span>
                 )}
               </Link>
+              </div>
             )
           })}
         </nav>
