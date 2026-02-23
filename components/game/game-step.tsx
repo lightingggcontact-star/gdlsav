@@ -11,10 +11,21 @@ interface GameStepProps {
   customerName: string
 }
 
+function fireConfetti(options: { particleCount: number; spread: number; origin: { y: number; x?: number }; angle?: number }) {
+  confetti({
+    ...options,
+    colors: ["#8B5CF6", "#A855F7", "#FFD200", "#ffffff"],
+    ticks: 200,
+    gravity: 1.2,
+    scalar: 1.1,
+  })
+}
+
 export default function GameStep({ onReveal, email, customerName }: GameStepProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [revealedReward, setRevealedReward] = useState<{ key: string; label: string; type: string } | null>(null)
+  const [shake, setShake] = useState(false)
 
   const handleSelect = useCallback(async (index: number) => {
     if (selectedIndex !== null || loading) return
@@ -32,31 +43,29 @@ export default function GameStep({ onReveal, email, customerName }: GameStepProp
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Erreur")
 
-      // Flip the card after a short suspense pause
+      // Suspense pause, then flip
       setTimeout(() => {
         setRevealedReward(data.reward)
-      }, 600)
+        setShake(true)
+        setTimeout(() => setShake(false), 500)
+      }, 800)
 
-      // Confetti after the flip completes
+      // First burst — from the sides
       setTimeout(() => {
-        confetti({
-          particleCount: 120,
-          spread: 90,
-          origin: { y: 0.6 },
-          colors: ["#8B5CF6", "#A855F7", "#FFD200", "#ffffff"],
-        })
-      }, 1400)
+        fireConfetti({ particleCount: 60, spread: 55, origin: { y: 0.65, x: 0.3 }, angle: 60 })
+        fireConfetti({ particleCount: 60, spread: 55, origin: { y: 0.65, x: 0.7 }, angle: 120 })
+      }, 1500)
 
-      // Second confetti + transition to result
+      // Second burst — center big
       setTimeout(() => {
-        confetti({
-          particleCount: 80,
-          spread: 60,
-          origin: { y: 0.5 },
-          colors: ["#8B5CF6", "#FFD200", "#ffffff"],
-        })
+        fireConfetti({ particleCount: 100, spread: 100, origin: { y: 0.55 } })
+      }, 1900)
+
+      // Third burst — rain down
+      setTimeout(() => {
+        fireConfetti({ particleCount: 40, spread: 160, origin: { y: 0.1 } })
         onReveal(data.reward)
-      }, 2400)
+      }, 2800)
     } catch (err) {
       console.error("Play error:", err)
       setTimeout(() => {
@@ -68,9 +77,13 @@ export default function GameStep({ onReveal, email, customerName }: GameStepProp
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={{
+        opacity: 1,
+        y: 0,
+        x: shake ? [0, -6, 6, -4, 4, -2, 2, 0] : 0,
+      }}
       exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.3 }}
+      transition={shake ? { duration: 0.5, x: { duration: 0.5 } } : { duration: 0.3 }}
       className="flex flex-col items-center gap-8 text-center"
     >
       <motion.h2
@@ -81,8 +94,21 @@ export default function GameStep({ onReveal, email, customerName }: GameStepProp
       >
         {selectedIndex === null ? (
           <>CHOISIS <span className="text-[#8B5CF6]">TA CARTE</span></>
+        ) : revealedReward ? (
+          <motion.span
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 300 }}
+          >
+            GAGNÉ !
+          </motion.span>
         ) : (
-          "RÉVÉLATION..."
+          <motion.span
+            animate={{ opacity: [1, 0.4, 1] }}
+            transition={{ duration: 1.2, repeat: Infinity }}
+          >
+            RÉVÉLATION...
+          </motion.span>
         )}
       </motion.h2>
 
@@ -97,7 +123,7 @@ export default function GameStep({ onReveal, email, customerName }: GameStepProp
         </motion.p>
       )}
 
-      <div className="flex items-center gap-4 sm:gap-6">
+      <div className="flex items-end gap-4 sm:gap-6">
         {[0, 1, 2].map((i) => (
           <GameCard
             key={i}
