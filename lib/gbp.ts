@@ -1,9 +1,9 @@
 // lib/gbp.ts
-// Service Google Places API (New) — récupération des infos et avis de la fiche
+// Service Google Places API (ancienne) — récupération des infos et avis de la fiche
 // Fiche cible : "Graine de Lascars"
 // Auth : API Key (pas besoin d'OAuth)
 
-const PLACES_API_BASE = "https://places.googleapis.com/v1"
+const PLACES_API_BASE = "https://maps.googleapis.com/maps/api/place"
 
 function getApiKey(): string {
   const key = process.env.GOOGLE_API_KEY
@@ -55,6 +55,18 @@ export interface GBPReviewsSummary {
 
 let cachedPlaceId: string | null = null
 
+// ─── Helpers ─────────────────────────────────────────────
+
+const DAY_INDEX_TO_NAME: Record<number, string> = {
+  0: "SUNDAY",
+  1: "MONDAY",
+  2: "TUESDAY",
+  3: "WEDNESDAY",
+  4: "THURSDAY",
+  5: "FRIDAY",
+  6: "SATURDAY",
+}
+
 // ─── Fonctions API ──────────────────────────────────────
 
 /** Recherche "Graine de Lascars" et retourne le placeId */
@@ -63,33 +75,31 @@ export async function findPlace(): Promise<string> {
 
   const apiKey = getApiKey()
 
-  const res = await fetch(`${PLACES_API_BASE}/places:searchText`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Goog-Api-Key": apiKey,
-      "X-Goog-FieldMask": "places.id,places.displayName",
-    },
-    body: JSON.stringify({
-      textQuery: "Graine de Lascars",
-      languageCode: "fr",
-    }),
+  const params = new URLSearchParams({
+    input: "Graine de Lascars",
+    inputtype: "textquery",
+    fields: "place_id,name",
+    language: "fr",
+    key: apiKey,
   })
+
+  const res = await fetch(`${PLACES_API_BASE}/findplacefromtext/json?${params}`)
 
   if (!res.ok) {
     const text = await res.text()
-    throw new Error(`Places Text Search API ${res.status}: ${text}`)
+    throw new Error(`Places Find Place API ${res.status}: ${text}`)
   }
 
-  const data = await res.json()
-  const places = data.places || []
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const data: any = await res.json()
 
-  if (places.length === 0) {
-    throw new Error("Aucun lieu trouvé pour 'Graine de Lascars'")
+  if (data.status !== "OK" || !data.candidates?.length) {
+    throw new Error(`Aucun lieu trouvé pour 'Graine de Lascars' (status: ${data.status})`)
   }
 
-  cachedPlaceId = places[0].id
+  cachedPlaceId = data.candidates[0].place_id
   return cachedPlaceId!
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 }
 
 /** Récupère les informations complètes de la fiche */
@@ -97,26 +107,28 @@ export async function getBusinessInfo(): Promise<GBPBusinessInfo> {
   const placeId = await findPlace()
   const apiKey = getApiKey()
 
-  const fieldMask = [
-    "id",
-    "displayName",
-    "formattedAddress",
-    "nationalPhoneNumber",
-    "internationalPhoneNumber",
-    "websiteUri",
-    "googleMapsUri",
+  const fields = [
+    "place_id",
+    "name",
+    "formatted_address",
+    "formatted_phone_number",
+    "international_phone_number",
+    "website",
+    "url",
     "rating",
-    "userRatingCount",
-    "regularOpeningHours",
-    "primaryTypeDisplayName",
+    "user_ratings_total",
+    "opening_hours",
+    "types",
   ].join(",")
 
-  const res = await fetch(`${PLACES_API_BASE}/places/${placeId}`, {
-    headers: {
-      "X-Goog-Api-Key": apiKey,
-      "X-Goog-FieldMask": fieldMask,
-    },
+  const params = new URLSearchParams({
+    place_id: placeId,
+    fields,
+    language: "fr",
+    key: apiKey,
   })
+
+  const res = await fetch(`${PLACES_API_BASE}/details/json?${params}`)
 
   if (!res.ok) {
     const text = await res.text()
@@ -124,31 +136,41 @@ export async function getBusinessInfo(): Promise<GBPBusinessInfo> {
   }
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
-  const place: any = await res.json()
+  const data: any = await res.json()
+
+  if (data.status !== "OK") {
+    throw new Error(`Places Details API erreur: ${data.status} — ${data.error_message ?? ""}`)
+  }
+
+  const place = data.result
 
   // Parser les horaires
   const regularHours: GBPBusinessInfo["regularHours"] = []
-  const periods = place.regularOpeningHours?.periods || []
+  const periods = place.opening_hours?.periods || []
   for (const p of periods) {
     if (p.open && p.close) {
       regularHours.push({
-        day: p.open.day ?? "",
-        openTime: `${String(p.open.hour ?? 0).padStart(2, "0")}:${String(p.open.minute ?? 0).padStart(2, "0")}`,
-        closeTime: `${String(p.close.hour ?? 0).padStart(2, "0")}:${String(p.close.minute ?? 0).padStart(2, "0")}`,
+        day: DAY_INDEX_TO_NAME[p.open.day] ?? String(p.open.day),
+        openTime: p.open.time
+          ? `${p.open.time.slice(0, 2)}:${p.open.time.slice(2)}`
+          : "00:00",
+        closeTime: p.close.time
+          ? `${p.close.time.slice(0, 2)}:${p.close.time.slice(2)}`
+          : "00:00",
       })
     }
   }
 
   return {
-    placeId: place.id ?? "",
-    title: place.displayName?.text ?? "",
-    address: place.formattedAddress ?? "",
-    phone: place.internationalPhoneNumber ?? place.nationalPhoneNumber ?? "",
-    website: place.websiteUri ?? "",
-    category: place.primaryTypeDisplayName?.text ?? "",
-    mapsUrl: place.googleMapsUri ?? "",
+    placeId: place.place_id ?? "",
+    title: place.name ?? "",
+    address: place.formatted_address ?? "",
+    phone: place.international_phone_number ?? place.formatted_phone_number ?? "",
+    website: place.website ?? "",
+    category: place.types?.[0]?.replace(/_/g, " ") ?? "",
+    mapsUrl: place.url ?? "",
     averageRating: place.rating ?? 0,
-    totalReviews: place.userRatingCount ?? 0,
+    totalReviews: place.user_ratings_total ?? 0,
     regularHours,
   }
   /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -162,13 +184,14 @@ export async function getReviews(): Promise<{
   const placeId = await findPlace()
   const apiKey = getApiKey()
 
-  const res = await fetch(`${PLACES_API_BASE}/places/${placeId}`, {
-    headers: {
-      "X-Goog-Api-Key": apiKey,
-      "X-Goog-FieldMask":
-        "reviews,rating,userRatingCount",
-    },
+  const params = new URLSearchParams({
+    place_id: placeId,
+    fields: "reviews,rating,user_ratings_total",
+    language: "fr",
+    key: apiKey,
   })
+
+  const res = await fetch(`${PLACES_API_BASE}/details/json?${params}`)
 
   if (!res.ok) {
     const text = await res.text()
@@ -178,27 +201,32 @@ export async function getReviews(): Promise<{
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const data: any = await res.json()
 
-  const reviews: GBPReview[] = (data.reviews || []).map(
+  if (data.status !== "OK") {
+    throw new Error(`Places Reviews API erreur: ${data.status} — ${data.error_message ?? ""}`)
+  }
+
+  const place = data.result
+
+  const reviews: GBPReview[] = (place.reviews || []).map(
     (r: any, i: number) => ({
       reviewId: `review-${i}`,
-      name: r.name ?? "",
+      name: r.author_name ?? "",
       reviewer: {
-        displayName: r.authorAttribution?.displayName ?? "Anonyme",
-        profilePhotoUrl: r.authorAttribution?.photoUri ?? null,
+        displayName: r.author_name ?? "Anonyme",
+        profilePhotoUrl: r.profile_photo_url ?? null,
       },
       rating: r.rating ?? 0,
-      comment: r.originalText?.text ?? r.text?.text ?? null,
-      createTime: r.publishTime ?? "",
-      relativeTime: r.relativePublishTimeDescription ?? "",
+      comment: r.text ?? null,
+      createTime: r.time ? new Date(r.time * 1000).toISOString() : "",
+      relativeTime: r.relative_time_description ?? "",
     })
   )
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
-  // Résumé basé sur les données globales de la fiche (pas juste les 5 avis)
-  const totalReviews = data.userRatingCount ?? reviews.length
-  const averageRating = data.rating ?? 0
+  const totalReviews = place.user_ratings_total ?? reviews.length
+  const averageRating = place.rating ?? 0
 
-  // Distribution estimée depuis les avis récupérés
+  // Distribution depuis les avis récupérés
   const distribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
   for (const review of reviews) {
     const r = Math.round(review.rating)

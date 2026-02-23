@@ -43,7 +43,7 @@ import {
 
 const PERIOD_OPTIONS: { value: InsightsPeriod; label: string }[] = [
   { value: "this_week", label: "Cette semaine" },
-  { value: "last_week", label: "Sem. derniere" },
+  { value: "last_week", label: "Sem. dernière" },
   { value: "this_month", label: "Ce mois" },
   { value: "last_3_months", label: "3 derniers mois" },
 ]
@@ -321,7 +321,7 @@ export default function InsightsPage() {
       if (error || !tickets || tickets.length === 0) {
         toast.error(
           tickets?.length === 0
-            ? "Aucun ticket sur cette periode. Synchronisez les tickets depuis le Dashboard."
+            ? "Aucun ticket sur cette période. Synchronisez les tickets depuis le Dashboard."
             : "Erreur de lecture des tickets."
         )
         setGenerating(false)
@@ -370,7 +370,7 @@ export default function InsightsPage() {
         ticketsAnalyzed: data.tickets_analyzed,
         generatedAt: new Date().toISOString(),
       })
-      toast.success(`Analyse terminee - ${data.tickets_analyzed} tickets`)
+      toast.success(`Analyse terminée — ${data.tickets_analyzed} tickets`)
     } catch {
       toast.error("Erreur de connexion")
     }
@@ -384,7 +384,7 @@ export default function InsightsPage() {
 
     let html = `<div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;color:#1a1a1a">`
     html += `<h1 style="font-size:20px;margin-bottom:4px">Rapport Insights SAV — ${periodLabel}</h1>`
-    html += `<p style="font-size:13px;color:#666;margin-top:0">${ticketsCount} tickets analyses — ${new Date().toLocaleDateString("fr-FR")}</p>`
+    html += `<p style="font-size:13px;color:#666;margin-top:0">${ticketsCount} tickets analysés — ${new Date().toLocaleDateString("fr-FR")}</p>`
     html += `<hr style="border:none;border-top:1px solid #e3e3e3;margin:16px 0">`
 
     // Pain points
@@ -421,7 +421,7 @@ export default function InsightsPage() {
     const pos = data.extreme_reviews.positive
     const neg = data.extreme_reviews.negative
     if (pos.length > 0 || neg.length > 0) {
-      html += `<h2 style="font-size:16px;margin:20px 0 8px">Avis Extremes</h2>`
+      html += `<h2 style="font-size:16px;margin:20px 0 8px">Avis Extrêmes</h2>`
 
       if (pos.length > 0) {
         html += `<h3 style="font-size:14px;color:#047B5D;margin-bottom:6px">👍 Ultra positifs</h3>`
@@ -434,7 +434,7 @@ export default function InsightsPage() {
       }
 
       if (neg.length > 0) {
-        html += `<h3 style="font-size:14px;color:#C70A24;margin:12px 0 6px">👎 Ultra negatifs</h3>`
+        html += `<h3 style="font-size:14px;color:#C70A24;margin:12px 0 6px">👎 Ultra négatifs</h3>`
         for (const r of neg) {
           html += `<div style="border-left:3px solid #C70A24;padding-left:10px;margin-bottom:10px">`
           html += `<p style="margin:0;font-size:13px;font-style:italic">"${r.quote}"</p>`
@@ -445,13 +445,13 @@ export default function InsightsPage() {
     }
 
     html += `<hr style="border:none;border-top:1px solid #e3e3e3;margin:20px 0 10px">`
-    html += `<p style="font-size:11px;color:#999;margin:0">Genere par GDL SAV — Analyse IA</p>`
+    html += `<p style="font-size:11px;color:#999;margin:0">Généré par GDL SAV — Analyse IA</p>`
     html += `</div>`
     return html
   }
 
   function buildEmailText(data: InsightsData, periodLabel: string, ticketsCount: number): string {
-    let text = `RAPPORT INSIGHTS SAV — ${periodLabel}\n${ticketsCount} tickets analyses — ${new Date().toLocaleDateString("fr-FR")}\n\n`
+    let text = `RAPPORT INSIGHTS SAV — ${periodLabel}\n${ticketsCount} tickets analysés — ${new Date().toLocaleDateString("fr-FR")}\n\n`
 
     if (data.pain_points.length > 0) {
       text += `=== PAIN POINTS ===\n`
@@ -474,13 +474,13 @@ export default function InsightsPage() {
     const pos = data.extreme_reviews.positive
     const neg = data.extreme_reviews.negative
     if (pos.length > 0 || neg.length > 0) {
-      text += `\n=== AVIS EXTREMES ===\n`
+      text += `\n=== AVIS EXTRÊMES ===\n`
       if (pos.length > 0) {
         text += `\nPositifs:\n`
         for (const r of pos) text += `  "${r.quote}" — ${r.customer_name}\n`
       }
       if (neg.length > 0) {
-        text += `\nNegatifs:\n`
+        text += `\nNégatifs:\n`
         for (const r of neg) text += `  "${r.quote}" — ${r.customer_name}\n`
       }
     }
@@ -515,7 +515,7 @@ export default function InsightsPage() {
       })
 
       if (res.ok) {
-        toast.success(`Rapport envoye a ${emailTo.trim()}`)
+        toast.success(`Rapport envoyé à ${emailTo.trim()}`)
         setEmailTo("")
       } else {
         const err = await res.json()
@@ -572,7 +572,7 @@ export default function InsightsPage() {
           <h1 className="text-xl font-semibold">Insights</h1>
           {meta && (
             <p className="text-xs text-muted-foreground mt-0.5">
-              Genere le {new Date(meta.generatedAt).toLocaleDateString("fr-FR")} sur {meta.ticketsAnalyzed} tickets
+              Généré le {new Date(meta.generatedAt).toLocaleDateString("fr-FR")} sur {meta.ticketsAnalyzed} tickets
             </p>
           )}
         </div>
@@ -606,7 +606,7 @@ export default function InsightsPage() {
             className="gap-2 bg-[#007AFF] text-white hover:bg-[#007AFF]/90"
           >
             {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {generating ? "Analyse en cours..." : insights ? "Regenerer" : "Generer"}
+            {generating ? "Analyse en cours..." : insights ? "Régénérer" : "Générer"}
           </Button>
         </div>
       </div>
@@ -647,9 +647,9 @@ export default function InsightsPage() {
             <div className="w-12 h-12 rounded-full bg-[#EAF3FF] flex items-center justify-center mb-3">
               <Lightbulb className="h-6 w-6 text-[#007AFF]" />
             </div>
-            <p className="text-sm font-medium">Aucune analyse pour cette periode</p>
+            <p className="text-sm font-medium">Aucune analyse pour cette période</p>
             <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-              Cliquez &quot;Generer&quot; pour que Claude analyse les tickets et identifie les pain points, objections et avis extremes.
+              Cliquez &quot;Générer&quot; pour que Claude analyse les tickets et identifie les pain points, objections et avis extrêmes.
             </p>
           </div>
         </div>
@@ -682,7 +682,7 @@ export default function InsightsPage() {
             />
             <KpiCard
               icon={ThumbsDown}
-              label="Avis negatifs"
+              label="Avis négatifs"
               value={insights.extreme_reviews.negative.length}
               color="#C70A24"
             />
@@ -701,7 +701,7 @@ export default function InsightsPage() {
               </TabsTrigger>
               <TabsTrigger value="reviews" className="gap-1.5">
                 <Quote className="h-3.5 w-3.5" />
-                Avis Extremes
+                Avis Extrêmes
               </TabsTrigger>
             </TabsList>
 
@@ -709,7 +709,7 @@ export default function InsightsPage() {
             <TabsContent value="pain_points" className="space-y-4 mt-4">
               {painPointChartData.length > 0 && (
                 <div className="rounded-lg border border-border bg-card p-5 shadow-[0_1px_0_0_rgba(0,0,0,.05)]">
-                  <h3 className="text-[13px] font-semibold mb-4">Frequence des pain points</h3>
+                  <h3 className="text-[13px] font-semibold mb-4">Fréquence des pain points</h3>
                   <ResponsiveContainer width="100%" height={painPointChartData.length * 40 + 20}>
                     <BarChart data={painPointChartData} layout="vertical" margin={{ left: 10, right: 20 }}>
                       <XAxis type="number" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
@@ -723,7 +723,7 @@ export default function InsightsPage() {
                       />
                       <RechartsTooltip
                         contentStyle={{ backgroundColor: "#fff", border: "1px solid #E3E3E3", borderRadius: "8px", fontSize: "12px" }}
-                        formatter={(value) => [`${value} occurrences`, "Frequence"]}
+                        formatter={(value) => [`${value} occurrences`, "Fréquence"]}
                       />
                       <Bar dataKey="frequency" radius={[0, 4, 4, 0]} barSize={20}>
                         {painPointChartData.map((entry, i) => (
@@ -742,7 +742,7 @@ export default function InsightsPage() {
               </div>
 
               {insights.pain_points.length === 0 && (
-                <p className="text-center text-sm text-muted-foreground py-8">Aucun pain point identifie</p>
+                <p className="text-center text-sm text-muted-foreground py-8">Aucun pain point identifié</p>
               )}
             </TabsContent>
 
@@ -750,7 +750,7 @@ export default function InsightsPage() {
             <TabsContent value="objections" className="space-y-4 mt-4">
               {objectionChartData.length > 0 && (
                 <div className="rounded-lg border border-border bg-card p-5 shadow-[0_1px_0_0_rgba(0,0,0,.05)]">
-                  <h3 className="text-[13px] font-semibold mb-4">Frequence des objections</h3>
+                  <h3 className="text-[13px] font-semibold mb-4">Fréquence des objections</h3>
                   <ResponsiveContainer width="100%" height={objectionChartData.length * 40 + 20}>
                     <BarChart data={objectionChartData} layout="vertical" margin={{ left: 10, right: 20 }}>
                       <XAxis type="number" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
@@ -764,7 +764,7 @@ export default function InsightsPage() {
                       />
                       <RechartsTooltip
                         contentStyle={{ backgroundColor: "#fff", border: "1px solid #E3E3E3", borderRadius: "8px", fontSize: "12px" }}
-                        formatter={(value) => [`${value} occurrences`, "Frequence"]}
+                        formatter={(value) => [`${value} occurrences`, "Fréquence"]}
                       />
                       <Bar dataKey="frequency" radius={[0, 4, 4, 0]} barSize={20} fill="#E67C00" />
                     </BarChart>
@@ -779,7 +779,7 @@ export default function InsightsPage() {
               </div>
 
               {insights.objections.length === 0 && (
-                <p className="text-center text-sm text-muted-foreground py-8">Aucune objection identifiee</p>
+                <p className="text-center text-sm text-muted-foreground py-8">Aucune objection identifiée</p>
               )}
             </TabsContent>
 
@@ -799,7 +799,7 @@ export default function InsightsPage() {
                       <ExtremeReviewCard key={i} review={r} type="positive" />
                     ))}
                     {insights.extreme_reviews.positive.length === 0 && (
-                      <p className="text-center text-xs text-muted-foreground py-4">Aucun avis ultra positif identifie</p>
+                      <p className="text-center text-xs text-muted-foreground py-4">Aucun avis ultra positif identifié</p>
                     )}
                   </div>
                 </div>
@@ -810,14 +810,14 @@ export default function InsightsPage() {
                     <div className="w-5 h-5 rounded-full bg-[#FEE8EB] flex items-center justify-center">
                       <ThumbsDown className="h-3 w-3 text-[#C70A24]" />
                     </div>
-                    Ultra negatifs
+                    Ultra négatifs
                   </h3>
                   <div className="space-y-3">
                     {insights.extreme_reviews.negative.map((r, i) => (
                       <ExtremeReviewCard key={i} review={r} type="negative" />
                     ))}
                     {insights.extreme_reviews.negative.length === 0 && (
-                      <p className="text-center text-xs text-muted-foreground py-4">Aucun avis ultra negatif identifie</p>
+                      <p className="text-center text-xs text-muted-foreground py-4">Aucun avis ultra négatif identifié</p>
                     )}
                   </div>
                 </div>

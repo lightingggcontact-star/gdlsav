@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     } = await request.json()
 
     if (!tickets || tickets.length === 0) {
-      return NextResponse.json({ error: "Aucun ticket a analyser" }, { status: 400 })
+      return NextResponse.json({ error: "Aucun ticket à analyser" }, { status: 400 })
     }
 
     const client = new Anthropic({ apiKey: key })
@@ -53,7 +53,7 @@ Tags: ${(t.tags || []).join(", ") || "aucun"}
 Date: ${new Date(t.created_at).toLocaleDateString("fr-FR")}
 Messages: ${t.message_count}
 Question client: ${t.first_message || "(vide)"}
-Derniere reponse: ${t.last_message || "(vide)"}
+Dernière réponse: ${t.last_message || "(vide)"}
 ---`
       )
       .join("\n\n")
@@ -64,9 +64,9 @@ Derniere reponse: ${t.last_message || "(vide)"}
       messages: [
         {
           role: "user",
-          content: `Tu es l'IA SAV de "Graine de Lascars" (e-commerce CBD francais).
+          content: `Tu es l'IA SAV de "Graine de Lascars" (e-commerce CBD français).
 
-Analyse ces ${tickets.length} tickets SAV de la periode "${periodLabel}" et extrais 3 types d'insights.
+Analyse ces ${tickets.length} tickets SAV de la période "${periodLabel}" et extrais 3 types d'insights.
 
 CONVERSATIONS :
 ${conversations}
@@ -76,43 +76,43 @@ EXTRAIS UN JSON avec ce format exact (pas de markdown, juste le JSON) :
   "pain_points": [
     {
       "id": 1,
-      "label": "nom court du probleme (ex: Colis bloque en transit)",
+      "label": "nom court du problème (ex: Colis bloqué en transit)",
       "description": "explication en 1-2 phrases",
-      "frequency": nombre estime d'occurrences dans ces tickets,
+      "frequency": nombre estimé d'occurrences dans ces tickets,
       "severity": "high" ou "medium" ou "low",
-      "example_ticket_id": numero du ticket exemple ou null,
-      "example_quote": "extrait du message client illustrant ce probleme (max 100 mots)",
-      "suggested_action": "action recommandee pour l'equipe SAV"
+      "example_ticket_id": numéro du ticket exemple ou null,
+      "example_quote": "extrait du message client illustrant ce problème (max 100 mots)",
+      "suggested_action": "action recommandée pour l'équipe SAV"
     }
   ],
   "objections": [
     {
       "id": 1,
-      "label": "nom de l'objection (ex: Delai de reponse trop long)",
+      "label": "nom de l'objection (ex: Délai de réponse trop long)",
       "description": "description de l'objection",
-      "frequency": nombre estime,
-      "context": "dans quel contexte cette objection apparait",
+      "frequency": nombre estimé,
+      "context": "dans quel contexte cette objection apparaît",
       "example_quote": "extrait du message client",
-      "recommended_response": "comment repondre a cette objection"
+      "recommended_response": "comment répondre à cette objection"
     }
   ],
   "extreme_reviews": {
     "positive": [
       {
-        "ticket_id": numero,
+        "ticket_id": numéro,
         "customer_name": "nom",
         "quote": "extrait du message positif (max 80 mots)",
-        "sentiment_score": 8 a 10,
-        "topic": "sujet (ex: qualite produit, service client)",
+        "sentiment_score": 8 à 10,
+        "topic": "sujet (ex: qualité produit, service client)",
         "date": "YYYY-MM-DD"
       }
     ],
     "negative": [
       {
-        "ticket_id": numero,
+        "ticket_id": numéro,
         "customer_name": "nom",
-        "quote": "extrait du message negatif (max 80 mots)",
-        "sentiment_score": 1 a 3,
+        "quote": "extrait du message négatif (max 80 mots)",
+        "sentiment_score": 1 à 3,
         "topic": "sujet",
         "date": "YYYY-MM-DD"
       }
@@ -120,13 +120,13 @@ EXTRAIS UN JSON avec ce format exact (pas de markdown, juste le JSON) :
   }
 }
 
-REGLES :
-- IGNORE les problemes de livraison/colis/suivi/tracking/retard — ils sont deja geres ailleurs. Concentre-toi sur les problemes PRODUIT, SERVICE, QUALITE, PRIX, COMMUNICATION, etc.
-- Pain points : entre 3 et 8, tries par frequence decroissante
-- Objections : entre 2 et 6, triees par frequence decroissante
-- Avis extremes : max 5 positifs et 5 negatifs, bases sur les VRAIS messages
-- Les citations doivent etre des VRAIS extraits de messages, pas inventes
-- Si pas assez de donnees pour une section, retourne un array vide
+RÈGLES :
+- IGNORE les problèmes de livraison/colis/suivi/tracking/retard — ils sont déjà gérés ailleurs. Concentre-toi sur les problèmes PRODUIT, SERVICE, QUALITÉ, PRIX, COMMUNICATION, etc.
+- Pain points : entre 3 et 8, triés par fréquence décroissante
+- Objections : entre 2 et 6, triées par fréquence décroissante
+- Avis extrêmes : max 5 positifs et 5 négatifs, basés sur les VRAIS messages
+- Les citations doivent être des VRAIS extraits de messages, pas inventés
+- Si pas assez de données pour une section, retourne un array vide
 - Seul le JSON, rien d'autre.`,
         },
       ],
