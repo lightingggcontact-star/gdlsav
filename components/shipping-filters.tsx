@@ -32,7 +32,7 @@ interface ShippingFiltersProps {
 
 const alertOptions: { value: AlertFilter; label: string; countKey?: keyof NonNullable<ShippingFiltersProps["counts"]> }[] = [
   { value: "all", label: "Tous", countKey: "total" },
-  { value: "delayed", label: "Retards", countKey: "delayed" },
+  { value: "delayed", label: "Problèmes", countKey: "delayed" },
   { value: "in_transit", label: "En transit", countKey: "inTransit" },
   { value: "delivered", label: "Livrés", countKey: "delivered" },
 ]

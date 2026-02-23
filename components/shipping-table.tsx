@@ -44,10 +44,10 @@ const alertBadge = {
 
 const laPosteStatusBadge: Record<string, { label: string; className: string }> = {
   delivered: { label: "Livré", className: "bg-[#CDFED4] text-[#047B5D] border-transparent" },
-  in_transit: { label: "En cours", className: "bg-[#EAF4FF] text-[#005BD3] border-transparent" },
-  problem: { label: "Problème", className: "bg-[#FFF1E3] text-[#E67C00] border-transparent" },
-  returned: { label: "Retour", className: "bg-[#F3E8FF] text-[#007AFF] border-transparent" },
-  unknown: { label: "—", className: "bg-secondary text-muted-foreground border-transparent" },
+  in_transit: { label: "En transit", className: "bg-[#EAF4FF] text-[#005BD3] border-transparent" },
+  problem: { label: "Problème", className: "bg-[#FEE8EB] text-[#C70A24] border-transparent" },
+  returned: { label: "Retourné", className: "bg-[#F3E8FF] text-[#7C3AED] border-transparent" },
+  unknown: { label: "Inconnu", className: "bg-secondary text-muted-foreground border-transparent" },
 }
 
 function getInitials(name: string): string {
@@ -231,9 +231,8 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
               <SortHeader label="Pays" sortKeyName="countryCode" />
               <SortHeader label="Expédié" sortKeyName="shippedAt" />
               <SortHeader label="Durée" sortKeyName="businessDaysElapsed" />
-              <TableHead>La Poste</TableHead>
               <TableHead>Tracking</TableHead>
-              <SortHeader label="Statut" sortKeyName="alertLevel" />
+              <SortHeader label="Statut La Poste" sortKeyName="alertLevel" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -325,20 +324,6 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
                     <DurationBar days={order.businessDaysElapsed} isDelayed={order.isDelayed} threshold={threshold} />
                   </TableCell>
                   <TableCell>
-                    {tracking ? (
-                      <Badge
-                        variant="outline"
-                        className={cn("text-[10px] font-medium", laPosteStatusBadge[tracking.statusSummary]?.className)}
-                      >
-                        {laPosteStatusBadge[tracking.statusSummary]?.label}
-                      </Badge>
-                    ) : order.trackingNumber ? (
-                      <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                    ) : (
-                      <span className="text-muted-foreground text-xs">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
                     {order.trackingUrl ? (
                       <a
                         href={order.trackingUrl}
@@ -355,9 +340,29 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={cn("text-[10px] font-medium", badge.className)}>
-                        {badge.label}
-                      </Badge>
+                      {tracking ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <Badge variant="outline" className={cn("text-[10px] font-medium cursor-default", laPosteStatusBadge[tracking.statusSummary]?.className)}>
+                              {laPosteStatusBadge[tracking.statusSummary]?.label}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" className="max-w-64 text-[12px]">
+                            <p>{tracking.lastEventLabel}</p>
+                            {tracking.lastEventDate && (
+                              <p className="text-[11px] opacity-70 mt-0.5">
+                                {new Date(tracking.lastEventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                              </p>
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : order.trackingNumber ? (
+                        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                      ) : (
+                        <Badge variant="outline" className={cn("text-[10px] font-medium", badge.className)}>
+                          {badge.label}
+                        </Badge>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation()

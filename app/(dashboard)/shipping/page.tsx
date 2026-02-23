@@ -118,7 +118,7 @@ export default function ShippingPage() {
 
   const fetchAllTracking = useCallback(async (orders: EnrichedOrder[]) => {
     const trackingNumbers = orders
-      .filter((o) => o.trackingNumber && o.alertLevel !== "delivered")
+      .filter((o) => o.trackingNumber)
       .map((o) => o.trackingNumber!)
       .filter((num, i, arr) => arr.indexOf(num) === i)
 
@@ -194,6 +194,17 @@ export default function ShippingPage() {
     }
   }
 
+  // Derive effective status: La Poste when available, fallback to Shopify
+  const getEffectiveStatus = useCallback((order: EnrichedOrder): "delayed" | "in_transit" | "delivered" => {
+    const lp = order.trackingNumber ? trackingMap[order.trackingNumber] : undefined
+    if (lp && lp.statusSummary !== "unknown") {
+      if (lp.statusSummary === "delivered") return "delivered"
+      if (lp.statusSummary === "problem" || lp.statusSummary === "returned") return "delayed"
+      return "in_transit"
+    }
+    return order.alertLevel
+  }, [trackingMap])
+
   // Filtered orders
   const filteredOrders = useMemo(() => {
     if (!data) return []
@@ -204,7 +215,7 @@ export default function ShippingPage() {
       : null
 
     return data.orders.filter((order) => {
-      if (alertFilter !== "all" && order.alertLevel !== alertFilter) return false
+      if (alertFilter !== "all" && getEffectiveStatus(order) !== alertFilter) return false
       if (countryFilter !== "all" && order.countryCode !== countryFilter) return false
       if (segOrderIds && !segOrderIds.has(order.id)) return false
 
@@ -219,17 +230,29 @@ export default function ShippingPage() {
 
       return true
     })
-  }, [data, alertFilter, countryFilter, searchQuery, segmentFilter, segments])
+  }, [data, alertFilter, countryFilter, searchQuery, segmentFilter, segments, getEffectiveStatus])
 
-  // Filtered stats
+  // Filtered stats — use La Poste status when available, fallback to Shopify alertLevel
   const filteredStats = useMemo(() => {
-    return {
-      total: filteredOrders.length,
-      delayed: filteredOrders.filter((o) => o.alertLevel === "delayed").length,
-      inTransit: filteredOrders.filter((o) => o.alertLevel === "in_transit").length,
-      delivered: filteredOrders.filter((o) => o.alertLevel === "delivered").length,
+    let delayed = 0
+    let inTransit = 0
+    let delivered = 0
+
+    for (const o of filteredOrders) {
+      const lp = o.trackingNumber ? trackingMap[o.trackingNumber] : undefined
+      if (lp && lp.statusSummary !== "unknown") {
+        if (lp.statusSummary === "delivered") delivered++
+        else if (lp.statusSummary === "problem" || lp.statusSummary === "returned") delayed++
+        else inTransit++
+      } else {
+        if (o.alertLevel === "delivered") delivered++
+        else if (o.alertLevel === "delayed") delayed++
+        else inTransit++
+      }
     }
-  }, [filteredOrders])
+
+    return { total: filteredOrders.length, delayed, inTransit, delivered }
+  }, [filteredOrders, trackingMap])
 
   if (loading) {
     return (

@@ -99,7 +99,7 @@ interface ShippingStatsProps {
 export function ShippingStats({ stats }: ShippingStatsProps) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      <StatCard label="Retards" value={stats.delayed} total={stats.total} icon={AlertTriangle} color="red" />
+      <StatCard label="Problèmes / Retards" value={stats.delayed} total={stats.total} icon={AlertTriangle} color="red" />
       <StatCard label="En transit" value={stats.inTransit} total={stats.total} icon={Truck} color="yellow" />
       <StatCard label="Livrés" value={stats.delivered} total={stats.total} icon={PackageCheck} color="green" />
       <StatCard label="Total" value={stats.total} total={stats.total} icon={BarChart3} color="neutral" />
