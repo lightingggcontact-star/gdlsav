@@ -17,6 +17,10 @@ import {
   ExternalLink,
   Save,
   MessageSquare,
+  Loader2,
+  AlertTriangle,
+  CircleCheck,
+  Undo2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -53,7 +57,7 @@ import {
   getReasonEmoji,
   getStatusOption,
 } from "@/lib/renvois"
-import type { Renvoi, RenvoiReason, RenvoiStatus } from "@/lib/types"
+import type { Renvoi, RenvoiReason, RenvoiStatus, LaPosteTracking } from "@/lib/types"
 import { toast } from "sonner"
 import {
   BarChart,
@@ -64,6 +68,16 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts"
+
+// ─── La Poste status config ──────────────────────────
+
+const LP_STATUS: Record<string, { label: string; icon: React.ElementType; bg: string; text: string }> = {
+  delivered: { label: "Livré", icon: CircleCheck, bg: "bg-emerald-500/10", text: "text-emerald-600" },
+  in_transit: { label: "En transit", icon: Truck, bg: "bg-blue-500/10", text: "text-blue-600" },
+  problem: { label: "Problème", icon: AlertTriangle, bg: "bg-orange-500/10", text: "text-orange-600" },
+  returned: { label: "Retourné", icon: Undo2, bg: "bg-purple-500/10", text: "text-purple-600" },
+  unknown: { label: "Inconnu", icon: Package, bg: "bg-secondary", text: "text-muted-foreground" },
+}
 
 // ─── Types locaux ────────────────────────────────────
 
@@ -124,6 +138,8 @@ function KpiCard({
 
 function RenvoiCard({
   renvoi,
+  tracking,
+  trackingLoading,
   onStatusChange,
   onTrackingChange,
   onNoteChange,
@@ -131,6 +147,8 @@ function RenvoiCard({
   onDelete,
 }: {
   renvoi: Renvoi
+  tracking?: LaPosteTracking
+  trackingLoading?: boolean
   onStatusChange: (id: string, status: RenvoiStatus) => void
   onTrackingChange: (id: string, tracking: string) => void
   onNoteChange: (id: string, note: string) => void
@@ -227,9 +245,9 @@ function RenvoiCard({
           </DropdownMenu>
         </div>
 
-        {/* Tracking du renvoi */}
-        <div className="rounded-lg border border-dashed border-border p-3">
-          <div className="flex items-center justify-between mb-1.5">
+        {/* Tracking du renvoi + La Poste status */}
+        <div className="rounded-lg border border-dashed border-border p-3 space-y-2">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <Truck className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-[12px] font-medium text-muted-foreground">Suivi du renvoi</span>
@@ -261,9 +279,61 @@ function RenvoiCard({
               </Button>
             </div>
           ) : (
-            <p className={cn("text-[13px]", renvoi.trackingNumber ? "font-mono" : "text-muted-foreground italic")}>
-              {renvoi.trackingNumber || "Pas encore de numéro de suivi"}
-            </p>
+            <div className="flex items-center justify-between">
+              <p className={cn("text-[13px]", renvoi.trackingNumber ? "font-mono" : "text-muted-foreground italic")}>
+                {renvoi.trackingNumber || "Pas encore de numéro de suivi"}
+              </p>
+              {renvoi.trackingNumber && (
+                <a
+                  href={`https://www.laposte.fr/outils/suivre-vos-envois?code=${renvoi.trackingNumber}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              )}
+            </div>
+          )}
+
+          {/* La Poste tracking status */}
+          {renvoi.trackingNumber && !editingTracking && (
+            <>
+              {trackingLoading ? (
+                <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Chargement du suivi La Poste...
+                </div>
+              ) : tracking ? (
+                <div className="space-y-1.5">
+                  {/* Status badge */}
+                  {(() => {
+                    const cfg = LP_STATUS[tracking.statusSummary] ?? LP_STATUS.unknown
+                    const StatusIcon = cfg.icon
+                    return (
+                      <div className={cn("inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-semibold", cfg.bg, cfg.text)}>
+                        <StatusIcon className="h-3 w-3" />
+                        {cfg.label}
+                      </div>
+                    )
+                  })()}
+                  {/* Last event */}
+                  {tracking.lastEventLabel && (
+                    <p className="text-[12px] text-muted-foreground">
+                      {tracking.lastEventLabel}
+                      {tracking.lastEventDate && (
+                        <span className="ml-1.5 text-[11px] opacity-70">
+                          — {new Date(tracking.lastEventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      )}
+                    </p>
+                  )}
+                  {tracking.error && !tracking.shipment && (
+                    <p className="text-[11px] text-orange-500">{tracking.error}</p>
+                  )}
+                </div>
+              ) : null}
+            </>
           )}
         </div>
 
@@ -363,16 +433,55 @@ export default function RenvoisPage() {
   // Dialog création
   const [showCreate, setShowCreate] = useState(false)
 
+  // La Poste tracking
+  const [trackingMap, setTrackingMap] = useState<Record<string, LaPosteTracking>>({})
+  const [trackingLoading, setTrackingLoading] = useState(false)
+
   // ─── Chargement ─────────────────────────────────────
 
   const loadRenvois = useCallback(async () => {
     const data = await getRenvois(supabase)
     setRenvois(data)
+    return data
   }, [supabase])
 
+  const fetchAllTracking = useCallback(async (renvoiList: Renvoi[]) => {
+    const numbers = renvoiList
+      .map((r) => r.trackingNumber)
+      .filter((n) => n && n.length > 3)
+      .filter((n, i, arr) => arr.indexOf(n) === i)
+
+    if (numbers.length === 0) return
+
+    setTrackingLoading(true)
+    try {
+      const res = await fetch("/api/tracking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ numbers }),
+      })
+      if (res.ok) {
+        const json = await res.json()
+        const map: Record<string, LaPosteTracking> = {}
+        for (const t of json.tracking) {
+          map[t.trackingNumber] = t
+        }
+        setTrackingMap(map)
+      }
+    } catch {
+      // silent
+    } finally {
+      setTrackingLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
-    loadRenvois().finally(() => setLoading(false))
-  }, [loadRenvois])
+    loadRenvois()
+      .then((data) => {
+        if (data?.length) fetchAllTracking(data)
+      })
+      .finally(() => setLoading(false))
+  }, [loadRenvois, fetchAllTracking])
 
   // ─── Stats ──────────────────────────────────────────
 
@@ -455,6 +564,18 @@ export default function RenvoisPage() {
     await updateRenvoiTracking(supabase, id, tracking)
     setRenvois((prev) => prev.map((r) => (r.id === id ? { ...r, trackingNumber: tracking } : r)))
     toast.success("Numéro de suivi enregistré")
+    // Fetch La Poste tracking for the new number
+    if (tracking && tracking.length > 3) {
+      try {
+        const res = await fetch(`/api/tracking?numbers=${encodeURIComponent(tracking)}`)
+        if (res.ok) {
+          const json = await res.json()
+          if (json.tracking?.[0]) {
+            setTrackingMap((prev) => ({ ...prev, [tracking]: json.tracking[0] }))
+          }
+        }
+      } catch { /* silent */ }
+    }
   }
 
   async function handleNoteChange(id: string, note: string) {
@@ -571,6 +692,8 @@ export default function RenvoisPage() {
                 <RenvoiCard
                   key={r.id}
                   renvoi={r}
+                  tracking={r.trackingNumber ? trackingMap[r.trackingNumber] : undefined}
+                  trackingLoading={trackingLoading && !!r.trackingNumber}
                   onStatusChange={handleStatusChange}
                   onTrackingChange={handleTrackingChange}
                   onNoteChange={handleNoteChange}
@@ -631,7 +754,8 @@ export default function RenvoisPage() {
         open={showCreate}
         onOpenChange={setShowCreate}
         onCreated={async () => {
-          await loadRenvois()
+          const data = await loadRenvois()
+          if (data?.length) fetchAllTracking(data)
           setShowCreate(false)
           toast.success("Renvoi créé avec succès")
         }}
