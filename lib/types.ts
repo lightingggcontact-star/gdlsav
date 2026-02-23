@@ -123,5 +123,6 @@ export interface Renvoi {
   trackingNumber: string
   note: string
   renvoiDate: string
+  colisRevenu: boolean
 }
 

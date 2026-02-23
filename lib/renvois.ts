@@ -16,6 +16,7 @@ function mapRow(row: any): Renvoi {
     trackingNumber: row.tracking_number ?? "",
     note: row.note ?? "",
     renvoiDate: row.renvoi_date,
+    colisRevenu: row.colis_revenu ?? false,
   }
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -88,16 +89,24 @@ export async function updateRenvoiNote(
   await supabase.from("renvois").update({ note }).eq("id", id)
 }
 
+export async function updateRenvoiColisRevenu(
+  supabase: SupabaseClient,
+  id: string,
+  colisRevenu: boolean
+) {
+  await supabase.from("renvois").update({ colis_revenu: colisRevenu }).eq("id", id)
+}
+
 export async function deleteRenvoi(supabase: SupabaseClient, id: string) {
   await supabase.from("renvois").delete().eq("id", id)
 }
 
-export const REASON_OPTIONS: { value: RenvoiReason; label: string }[] = [
-  { value: "colis_perdu", label: "Colis perdu" },
-  { value: "colis_endommage", label: "Colis endommagé" },
-  { value: "erreur_preparation", label: "Erreur préparation" },
-  { value: "retour_client", label: "Retour client" },
-  { value: "autre", label: "Autre" },
+export const REASON_OPTIONS: { value: RenvoiReason; label: string; emoji: string }[] = [
+  { value: "colis_perdu", label: "Colis perdu", emoji: "📦" },
+  { value: "colis_endommage", label: "Colis endommagé", emoji: "💔" },
+  { value: "erreur_preparation", label: "Erreur préparation", emoji: "⚠️" },
+  { value: "retour_client", label: "Retour client", emoji: "↩️" },
+  { value: "autre", label: "Autre", emoji: "📋" },
 ]
 
 export const STATUS_OPTIONS: { value: RenvoiStatus; label: string; bg: string; text: string }[] = [
@@ -109,6 +118,10 @@ export const STATUS_OPTIONS: { value: RenvoiStatus; label: string; bg: string; t
 
 export function getReasonLabel(reason: RenvoiReason): string {
   return REASON_OPTIONS.find((r) => r.value === reason)?.label ?? reason
+}
+
+export function getReasonEmoji(reason: RenvoiReason): string {
+  return REASON_OPTIONS.find((r) => r.value === reason)?.emoji ?? "📋"
 }
 
 export function getStatusOption(status: RenvoiStatus) {
