@@ -362,6 +362,83 @@ export async function fetchOrdersByEmail(email: string): Promise<CustomerOrderIn
   return { totalOrders, totalSpent, orders }
 }
 
+// ─── Search orders by name, email, or customer name ───
+
+const SEARCH_ORDERS_QUERY = `
+  query SearchOrders($query: String!) {
+    orders(first: 10, query: $query, sortKey: CREATED_AT, reverse: true) {
+      edges {
+        node {
+          id
+          name
+          createdAt
+          totalPriceSet {
+            shopMoney {
+              amount
+              currencyCode
+            }
+          }
+          displayFulfillmentStatus
+          customer {
+            firstName
+            lastName
+            email
+          }
+        }
+      }
+    }
+  }
+`
+
+export interface SearchOrderResult {
+  id: string
+  name: string
+  createdAt: string
+  totalPrice: string
+  fulfillmentStatus: string | null
+  customerName: string
+  customerEmail: string
+}
+
+export async function searchOrders(query: string): Promise<SearchOrderResult[]> {
+  const trimmed = query.trim()
+  if (!trimmed) return []
+
+  let shopifyQuery: string
+  if (trimmed.startsWith("#") || /^GDL-?\d+$/i.test(trimmed)) {
+    shopifyQuery = `name:${trimmed}`
+  } else if (trimmed.includes("@")) {
+    shopifyQuery = `email:${trimmed}`
+  } else {
+    shopifyQuery = trimmed
+  }
+
+  const response = await shopifyGraphQL(SEARCH_ORDERS_QUERY, {
+    query: shopifyQuery,
+  })
+
+  if (response.errors?.length) {
+    throw new Error(
+      `Shopify GraphQL errors: ${response.errors.map((e) => e.message).join(", ")}`
+    )
+  }
+
+  const edges = (response.data as any)?.orders?.edges ?? []
+
+  return edges.map((edge: any) => {
+    const node = edge.node
+    return {
+      id: node.id,
+      name: node.name,
+      createdAt: node.createdAt,
+      totalPrice: node.totalPriceSet.shopMoney.amount,
+      fulfillmentStatus: node.displayFulfillmentStatus,
+      customerName: [node.customer?.firstName, node.customer?.lastName].filter(Boolean).join(" "),
+      customerEmail: node.customer?.email ?? "",
+    }
+  })
+}
+
 export async function testConnection(): Promise<boolean> {
   try {
     const response = await shopifyGraphQL(

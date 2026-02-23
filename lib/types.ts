@@ -105,3 +105,23 @@ export interface Segment {
   notes: Record<string, string>
 }
 
+// === Renvois ===
+
+export type RenvoiReason = "colis_perdu" | "colis_endommage" | "erreur_preparation" | "retour_client" | "autre"
+export type RenvoiStatus = "en_cours" | "expedie" | "livre" | "annule"
+
+export interface Renvoi {
+  id: string
+  createdAt: string
+  shopifyOrderId: string
+  orderName: string
+  orderTotal: string
+  customerName: string
+  customerEmail: string
+  reason: RenvoiReason
+  status: RenvoiStatus
+  trackingNumber: string
+  note: string
+  renvoiDate: string
+}
+

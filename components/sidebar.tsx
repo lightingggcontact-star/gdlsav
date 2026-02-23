@@ -12,6 +12,7 @@ import {
   X,
   MessageSquare,
   MapPin,
+  RotateCcw,
 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/messages", label: "Messagerie", icon: MessageSquare, badgeKey: "messages" as const },
   { href: "/shipping", label: "Livraisons", icon: Package, badgeKey: "delayed" as const },
+  { href: "/renvois", label: "Renvois", icon: RotateCcw },
   { href: "/forms", label: "Formulaires", icon: FileText },
   { href: "/google-fiches", label: "Google Fiches", icon: MapPin },
   { href: "/settings", label: "Paramètres", icon: Settings },
