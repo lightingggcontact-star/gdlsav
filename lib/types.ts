@@ -126,3 +126,56 @@ export interface Renvoi {
   colisRevenu: boolean
 }
 
+// === Insights ===
+
+export type InsightsPeriod = "this_week" | "last_week" | "this_month" | "last_3_months"
+
+export interface PainPoint {
+  id: number
+  label: string
+  description: string
+  frequency: number
+  severity: "high" | "medium" | "low"
+  example_ticket_id: number | null
+  example_quote: string
+  suggested_action: string
+}
+
+export interface Objection {
+  id: number
+  label: string
+  description: string
+  frequency: number
+  context: string
+  example_quote: string
+  recommended_response: string
+}
+
+export interface ExtremeReview {
+  ticket_id: number
+  customer_name: string
+  quote: string
+  sentiment_score: number
+  topic: string
+  date: string
+}
+
+export interface InsightsData {
+  pain_points: PainPoint[]
+  objections: Objection[]
+  extreme_reviews: { positive: ExtremeReview[]; negative: ExtremeReview[] }
+}
+
+export interface InsightsCacheRow {
+  id: string
+  period_key: string
+  period_label: string
+  period_from: string
+  period_to: string
+  tickets_analyzed: number
+  pain_points: PainPoint[]
+  objections: Objection[]
+  extreme_reviews: { positive: ExtremeReview[]; negative: ExtremeReview[] }
+  generated_at: string
+}
+
