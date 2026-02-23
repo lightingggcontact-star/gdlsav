@@ -113,37 +113,18 @@ export async function fetchTracking(
 
       const data = await res.json()
 
-      // Single tracking number returns a single shipment object
-      // Multiple returns could be 207 with multiple results
+      // Single tracking number → object { returnCode, shipment }
+      // Multiple tracking numbers → array [ { returnCode, shipment }, ... ]
       if (batch.length === 1) {
         const tracking = parseSingleResponse(batch[0], data)
         results.push(tracking)
-      } else {
-        // For multi-tracking, the response code 207 means mixed results
-        // Each shipment is in data.shipment (could be array or single)
-        if (data.returnCode === 207 && Array.isArray(data.shipment)) {
-          for (let i = 0; i < batch.length; i++) {
-            const shipmentData = data.shipment[i]
-            if (shipmentData) {
-              results.push(parseShipment(batch[i], shipmentData))
-            } else {
-              results.push({
-                trackingNumber: batch[i],
-                returnCode: 404,
-                error: "Suivi non trouvé",
-                lastEventLabel: "Non trouvé",
-                lastEventCode: "",
-                lastEventDate: "",
-                statusSummary: "unknown",
-              })
-            }
-          }
-        } else {
-          // Single result for the batch
-          const tracking = parseSingleResponse(batch[0], data)
-          results.push(tracking)
-          // Mark others as not found if only one returned
-          for (let i = 1; i < batch.length; i++) {
+      } else if (Array.isArray(data)) {
+        // Multi-tracking: La Poste returns an array of individual responses
+        for (let i = 0; i < batch.length; i++) {
+          const item = data[i]
+          if (item) {
+            results.push(parseSingleResponse(batch[i], item))
+          } else {
             results.push({
               trackingNumber: batch[i],
               returnCode: 404,
@@ -154,6 +135,21 @@ export async function fetchTracking(
               statusSummary: "unknown",
             })
           }
+        }
+      } else {
+        // Fallback: unexpected format, parse as single response
+        const tracking = parseSingleResponse(batch[0], data)
+        results.push(tracking)
+        for (let i = 1; i < batch.length; i++) {
+          results.push({
+            trackingNumber: batch[i],
+            returnCode: 404,
+            error: "Suivi non trouvé",
+            lastEventLabel: "Non trouvé",
+            lastEventCode: "",
+            lastEventDate: "",
+            statusSummary: "unknown",
+          })
         }
       }
     } catch (err) {
