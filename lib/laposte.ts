@@ -223,20 +223,29 @@ function parseShipment(
 }
 
 /**
- * Test La Poste API connection
+ * Test La Poste API connection.
+ * La Poste returns 404 for unknown tracking numbers but the body still contains
+ * a valid JSON with returnCode (e.g. 104). A 401/403 means the key is invalid.
+ * So we consider the API "connected" as long as the response is valid JSON
+ * and not an auth error.
  */
 export async function testConnection(): Promise<boolean> {
   if (!API_KEY) return false
 
   try {
-    // Use a known sandbox number for testing
     const res = await fetch(`${BASE_URL}/LU680211095FR?lang=fr_FR`, {
       headers: {
         Accept: "application/json",
         "X-Okapi-Key": API_KEY,
       },
     })
-    return res.ok
+
+    // Auth errors mean the key is bad
+    if (res.status === 401 || res.status === 403) return false
+
+    // Any other response (200, 404 with returnCode 104, etc.) means the API is reachable
+    const data = await res.json()
+    return typeof data.returnCode === "number"
   } catch {
     return false
   }
