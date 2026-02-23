@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import { AnimatePresence } from "framer-motion"
 import LandingStep from "@/components/game/landing-step"
 import VerifyStep from "@/components/game/verify-step"
@@ -23,7 +24,10 @@ interface VerifyData {
   orders: Order[]
 }
 
-export default function PlayPage() {
+function PlayContent() {
+  const searchParams = useSearchParams()
+  const emailFromUrl = searchParams.get("email")
+
   const [step, setStep] = useState<Step>("landing")
   const [loading, setLoading] = useState(false)
   const [verifyData, setVerifyData] = useState<VerifyData | null>(null)
@@ -32,6 +36,7 @@ export default function PlayPage() {
   const [errorCode, setErrorCode] = useState("")
   const [alreadyPlayedReward, setAlreadyPlayedReward] = useState("")
   const [landingError, setLandingError] = useState<string | null>(null)
+  const [autoTriggered, setAutoTriggered] = useState(false)
 
   const handleEmailSubmit = useCallback(async (email: string) => {
     setLoading(true)
@@ -72,6 +77,14 @@ export default function PlayPage() {
     }
   }, [])
 
+  // Auto-submit if email is in the URL (?email=xxx@xxx.com)
+  useEffect(() => {
+    if (emailFromUrl && !autoTriggered) {
+      setAutoTriggered(true)
+      handleEmailSubmit(emailFromUrl)
+    }
+  }, [emailFromUrl, autoTriggered, handleEmailSubmit])
+
   const handleConfirm = useCallback(() => {
     setStep("game")
   }, [])
@@ -89,6 +102,7 @@ export default function PlayPage() {
           onSubmit={handleEmailSubmit}
           loading={loading}
           error={landingError}
+          prefillEmail={emailFromUrl || undefined}
         />
       )}
       {step === "verify" && verifyData && (
@@ -118,5 +132,13 @@ export default function PlayPage() {
         <ErrorScreen key="error" message={errorMsg} code={errorCode} />
       )}
     </AnimatePresence>
+  )
+}
+
+export default function PlayPage() {
+  return (
+    <Suspense>
+      <PlayContent />
+    </Suspense>
   )
 }

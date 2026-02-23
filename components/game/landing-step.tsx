@@ -7,10 +7,11 @@ interface LandingStepProps {
   onSubmit: (email: string) => void
   loading: boolean
   error: string | null
+  prefillEmail?: string
 }
 
-export default function LandingStep({ onSubmit, loading, error }: LandingStepProps) {
-  const [email, setEmail] = useState("")
+export default function LandingStep({ onSubmit, loading, error, prefillEmail }: LandingStepProps) {
+  const [email, setEmail] = useState(prefillEmail || "")
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
