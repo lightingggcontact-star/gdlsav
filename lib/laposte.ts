@@ -72,14 +72,31 @@ export async function fetchTracking(
       })
 
       if (!res.ok) {
+        // Try to parse body even on error — La Poste returns useful messages
+        let errorBody: { returnCode?: number; returnMessage?: string } | null = null
+        try { errorBody = await res.json() } catch { /* ignore */ }
+
+        if (res.status === 400 && errorBody?.returnMessage && batch.length === 1) {
+          // Single tracking number with La Poste error message
+          results.push({
+            trackingNumber: batch[0],
+            returnCode: errorBody.returnCode ?? res.status,
+            error: errorBody.returnMessage,
+            lastEventLabel: errorBody.returnMessage,
+            lastEventCode: "",
+            lastEventDate: "",
+            statusSummary: "unknown",
+          })
+          continue
+        }
+
         const errorMsg =
           res.status === 403
             ? "API La Poste non activée — abonnez l'app à Suivi v2 sur developer.laposte.fr"
             : res.status === 401
               ? "Clé API La Poste invalide"
-              : `Erreur API La Poste (${res.status})`
+              : errorBody?.returnMessage ?? `Erreur API La Poste (${res.status})`
 
-        // If the whole batch fails, return error for each
         for (const num of batch) {
           results.push({
             trackingNumber: num,
@@ -163,6 +180,18 @@ function parseSingleResponse(
 ): LaPosteTracking {
   if (data.returnCode === 200 && data.shipment) {
     return parseShipment(trackingNumber, data.shipment)
+  }
+
+  // Code 104 = La Poste est prête à prendre en charge le colis → "in_transit"
+  if (data.returnCode === 104) {
+    return {
+      trackingNumber,
+      returnCode: 104,
+      lastEventLabel: data.returnMessage ?? "Pris en charge prochainement",
+      lastEventCode: "",
+      lastEventDate: "",
+      statusSummary: "in_transit",
+    }
   }
 
   return {
