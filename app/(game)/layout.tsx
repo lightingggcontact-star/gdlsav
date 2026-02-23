@@ -24,6 +24,17 @@ export default function GameLayout({
       {/* Background layer */}
       <div className="game-bg-layer" aria-hidden="true" />
 
+      {/* Smoke wisps */}
+      <div className="smoke-layer" aria-hidden="true">
+        <div className="smoke-wisp" />
+        <div className="smoke-wisp" />
+        <div className="smoke-wisp" />
+        <div className="smoke-wisp" />
+        <div className="smoke-wisp" />
+        <div className="smoke-wisp" />
+        <div className="smoke-wisp" />
+      </div>
+
       {/* Top marquee ticker */}
       <div className="brutal-marquee fixed top-0 right-0 left-0 z-20 border-b-2 border-white/20 bg-[#0a0a0a] py-2">
         <div className="brutal-marquee-inner text-xs font-bold uppercase tracking-widest text-[#8B5CF6]">
