@@ -12,81 +12,77 @@ export default function ResultStep({ reward }: ResultStepProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.8 }}
+      initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.6, ease: "easeOut" }}
+      transition={{ duration: 0.3 }}
       className="flex w-full max-w-md flex-col items-center gap-6 text-center"
     >
       <motion.div
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
-        transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+        transition={{ delay: 0.1, type: "spring", stiffness: 300 }}
         className="text-6xl"
       >
-        {isJackpot ? "🏆" : "🎉"}
+        {isJackpot ? "🏆" : "🎁"}
       </motion.div>
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="game-neon-box w-full rounded-2xl border border-[#4CAF50]/30 bg-[#1a2a1a] p-8"
+        transition={{ delay: 0.2 }}
+        className="brutal-panel w-full p-8"
       >
-        <p className="text-sm uppercase tracking-wider text-gray-400">Tu as gagné</p>
+        <p className="text-xs font-bold uppercase tracking-widest text-[#888]">
+          Tu as gagné
+        </p>
         <motion.h2
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.6, type: "spring" }}
-          className="game-neon-glow mt-3 text-3xl font-bold text-[#4CAF50] sm:text-4xl"
-          style={{ fontFamily: "Bangers, cursive" }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="mt-3 text-3xl font-bold uppercase text-[#8B5CF6] sm:text-4xl"
         >
           {reward.label}
         </motion.h2>
 
         {isJackpot && (
-          <motion.p
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.8 }}
-            className="mt-2 text-[#FFD700]"
-            style={{ fontFamily: "Bangers, cursive" }}
+            transition={{ delay: 0.4 }}
+            className="mt-3"
           >
-            JACKPOT ! 🔥🔥🔥
-          </motion.p>
+            <span className="brutal-badge text-sm">JACKPOT</span>
+          </motion.div>
         )}
       </motion.div>
 
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.8 }}
+        transition={{ delay: 0.5 }}
       >
         {isManual ? (
-          <p className="text-gray-400">
-            Envoie un message à Baba sur WhatsApp pour récupérer ton gain !
+          <p className="text-sm text-[#888]">
+            Envoie un message à Baba sur WhatsApp pour récupérer ton gain.
           </p>
         ) : (
-          <p className="text-gray-400">
-            Ton code promo arrive bientôt ! On te contacte très vite.
+          <p className="text-sm text-[#888]">
+            Ton code promo arrive bientôt. On te contacte très vite.
           </p>
         )}
       </motion.div>
 
-      <motion.div
+      <motion.a
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1 }}
-        className="flex w-full flex-col gap-3"
+        transition={{ delay: 0.6 }}
+        href="https://grainedelascars.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="brutal-btn border-2 border-[#8B5CF6] bg-transparent px-8 py-3 text-sm text-[#8B5CF6] shadow-[4px_4px_0px_#8B5CF6] hover:bg-[#8B5CF6] hover:text-black"
       >
-        <a
-          href="https://grainedelascars.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="rounded-full border border-[#4CAF50]/30 px-8 py-3 text-sm font-medium text-[#4CAF50] transition-colors hover:border-[#4CAF50]/60 hover:bg-[#4CAF50]/5"
-        >
-          Retour à la boutique
-        </a>
-      </motion.div>
+        RETOUR À LA BOUTIQUE
+      </motion.a>
     </motion.div>
   )
 }

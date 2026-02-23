@@ -28,59 +28,60 @@ export default function VerifyStep({ customerName, orders, onConfirm, loading }:
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 30 }}
+      initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -30 }}
-      transition={{ duration: 0.5 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.3 }}
       className="flex w-full max-w-md flex-col items-center gap-6 text-center"
     >
       <motion.h2
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className="game-neon-glow text-3xl font-bold text-[#4CAF50] sm:text-4xl"
-        style={{ fontFamily: "Bangers, cursive" }}
+        transition={{ delay: 0.1 }}
+        className="text-3xl font-bold uppercase text-white sm:text-4xl"
       >
-        C&apos;est bien toi, {firstName} ?
+        C&apos;EST BIEN TOI,{" "}
+        <span className="text-[#8B5CF6]">{firstName}</span> ?
       </motion.h2>
 
       {orders.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.2 }}
           className="w-full space-y-3"
         >
-          <p className="text-sm text-gray-400">Tes dernières commandes :</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-[#888]">
+            Tes dernières commandes
+          </p>
           {orders.map((order, i) => (
             <motion.div
               key={order.name}
-              initial={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.5 + i * 0.1 }}
-              className="game-neon-box rounded-xl border border-[#4CAF50]/20 bg-[#1a2a1a] p-4 text-left"
+              transition={{ delay: 0.3 + i * 0.08 }}
+              className="brutal-panel p-4 text-left"
             >
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-white">{order.name}</span>
-                <span className="text-sm font-medium text-[#4CAF50]">{order.total}€</span>
+                <span className="font-bold text-white">{order.name}</span>
+                <span className="font-bold text-[#FFD200]">{order.total}&euro;</span>
               </div>
-              <p className="mt-1 text-xs text-gray-500">{formatDate(order.date)}</p>
+              <p className="mt-1 text-xs text-[#888]">{formatDate(order.date)}</p>
             </motion.div>
           ))}
         </motion.div>
       )}
 
       <motion.button
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.7 }}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5 }}
+        whileTap={{ scale: 0.98 }}
         onClick={onConfirm}
         disabled={loading}
-        className="game-btn-pulse mt-2 w-full rounded-full bg-[#4CAF50] px-8 py-4 text-lg font-bold text-black transition-colors hover:bg-[#66BB6A] disabled:opacity-50 disabled:animate-none"
+        className="brutal-btn mt-2 w-full border-2 border-white bg-[#8B5CF6] px-8 py-4 text-lg text-black shadow-[4px_4px_0px_#000]"
       >
-        {loading ? "Préparation..." : "Oui c'est moi ! 🎯"}
+        {loading ? "PRÉPARATION..." : "OUI C'EST MOI"}
       </motion.button>
     </motion.div>
   )

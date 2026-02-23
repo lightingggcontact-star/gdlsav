@@ -1,14 +1,20 @@
-/* Game theme — weed/smoke/fun */
+/* ═══════════════════════════════════════════
+   BRUTAL GAME THEME — Néo-brutaliste + Violet
+   ═══════════════════════════════════════════ */
 
-@font-face {
-  font-family: "Bangers";
-  src: url("https://fonts.gstatic.com/s/bangers/v24/FeVQS0BTqb0h60ACH5pQ2J5hm24.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
+:root {
+  --brutal-bg: #0a0a0a;
+  --brutal-surface: #141414;
+  --brutal-border: #ffffff;
+  --brutal-violet: #8B5CF6;
+  --brutal-violet-bright: #A855F7;
+  --brutal-yellow: #FFD200;
+  --brutal-white: #ffffff;
+  --brutal-gray: #888888;
+  --brutal-red: #FF3333;
 }
 
-/* ─── Background: blurred image + dark overlay + green radial ─── */
+/* ─── Background: image + heavy dark overlay ─── */
 .game-bg-layer {
   position: fixed;
   inset: 0;
@@ -19,149 +25,131 @@
 .game-bg-layer::before {
   content: "";
   position: absolute;
-  inset: -20px;
-  background: url("/game-bg.jpeg") center / cover repeat;
-  filter: blur(8px) brightness(0.5);
+  inset: -10px;
+  background: url("/game-bg.jpeg") center / cover no-repeat;
+  filter: brightness(0.25) saturate(0.4);
 }
 
 .game-bg-layer::after {
   content: "";
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(ellipse at 50% 0%, rgba(76, 175, 80, 0.15), transparent 60%),
-    radial-gradient(ellipse at 50% 100%, rgba(76, 175, 80, 0.1), transparent 50%),
-    rgba(0, 0, 0, 0.6);
+  background: rgba(10, 10, 10, 0.88);
 }
 
-/* ─── Floating smoke particles (ambient) ─── */
-@keyframes game-float-smoke {
-  0% { transform: translateY(0) translateX(0) scale(1); opacity: 0; }
-  10% { opacity: 0.15; }
-  50% { transform: translateY(-40vh) translateX(20px) scale(2); opacity: 0.08; }
-  100% { transform: translateY(-80vh) translateX(-10px) scale(3); opacity: 0; }
+/* ─── Card Flip 3D ─── */
+.brutal-card {
+  perspective: 1000px;
 }
 
-.game-ambient-smoke {
-  position: fixed;
-  bottom: -20px;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(200, 200, 200, 0.2), transparent 70%);
-  pointer-events: none;
-  z-index: 1;
-  animation: game-float-smoke 8s ease-out infinite;
+.brutal-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.game-ambient-smoke:nth-child(1) { left: 10%; animation-delay: 0s; animation-duration: 10s; }
-.game-ambient-smoke:nth-child(2) { left: 30%; animation-delay: 2s; animation-duration: 12s; width: 80px; height: 80px; }
-.game-ambient-smoke:nth-child(3) { left: 55%; animation-delay: 4s; animation-duration: 9s; }
-.game-ambient-smoke:nth-child(4) { left: 75%; animation-delay: 1s; animation-duration: 11s; width: 50px; height: 50px; }
-.game-ambient-smoke:nth-child(5) { left: 90%; animation-delay: 3s; animation-duration: 13s; width: 70px; height: 70px; }
-
-/* ─── Floating weed leaves (subtle decorations) ─── */
-@keyframes game-leaf-float {
-  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
-  10% { opacity: 0.3; }
-  50% { opacity: 0.2; }
-  100% { transform: translateY(-100vh) rotate(360deg); opacity: 0; }
+.brutal-card-inner.flipped {
+  transform: rotateY(180deg);
 }
 
-.game-floating-leaf {
-  position: fixed;
-  bottom: -40px;
-  font-size: 24px;
-  pointer-events: none;
-  z-index: 1;
-  animation: game-leaf-float 15s ease-out infinite;
-}
-
-.game-floating-leaf:nth-child(1) { left: 5%; animation-delay: 0s; animation-duration: 18s; font-size: 20px; }
-.game-floating-leaf:nth-child(2) { left: 20%; animation-delay: 5s; animation-duration: 16s; font-size: 28px; }
-.game-floating-leaf:nth-child(3) { left: 45%; animation-delay: 8s; animation-duration: 20s; font-size: 18px; }
-.game-floating-leaf:nth-child(4) { left: 65%; animation-delay: 3s; animation-duration: 14s; font-size: 22px; }
-.game-floating-leaf:nth-child(5) { left: 85%; animation-delay: 10s; animation-duration: 17s; font-size: 26px; }
-
-/* ─── Neon glow ─── */
-.game-neon-glow {
-  text-shadow:
-    0 0 10px rgba(76, 175, 80, 0.6),
-    0 0 20px rgba(76, 175, 80, 0.4),
-    0 0 40px rgba(76, 175, 80, 0.2),
-    0 0 80px rgba(76, 175, 80, 0.1);
-}
-
-.game-neon-box {
-  box-shadow:
-    0 0 15px rgba(76, 175, 80, 0.25),
-    0 0 30px rgba(76, 175, 80, 0.15),
-    inset 0 0 15px rgba(76, 175, 80, 0.05);
-}
-
-/* ─── Pulse button ─── */
-@keyframes game-pulse {
-  0%, 100% { box-shadow: 0 0 15px rgba(76, 175, 80, 0.4), 0 0 30px rgba(76, 175, 80, 0.2); }
-  50% { box-shadow: 0 0 25px rgba(76, 175, 80, 0.7), 0 0 50px rgba(76, 175, 80, 0.4), 0 0 80px rgba(76, 175, 80, 0.15); }
-}
-
-.game-btn-pulse {
-  animation: game-pulse 2s ease-in-out infinite;
-}
-
-/* ─── Smoke particles (on pochon select) ─── */
-@keyframes game-smoke {
-  0% { transform: translateY(0) scale(1); opacity: 0.5; }
-  30% { opacity: 0.3; }
-  60% { transform: translateY(-40px) scale(2); opacity: 0.15; }
-  100% { transform: translateY(-70px) scale(2.5); opacity: 0; }
-}
-
-.game-smoke {
+.brutal-card-front,
+.brutal-card-back {
   position: absolute;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(180, 180, 180, 0.4), transparent);
-  animation: game-smoke 2s ease-out forwards;
-  pointer-events: none;
-}
-
-/* ─── Pochon shake ─── */
-@keyframes pochon-shake {
-  0%, 100% { transform: rotate(0deg); }
-  10% { transform: rotate(-8deg); }
-  20% { transform: rotate(8deg); }
-  30% { transform: rotate(-6deg); }
-  40% { transform: rotate(6deg); }
-  50% { transform: rotate(-4deg); }
-  60% { transform: rotate(4deg); }
-  70% { transform: rotate(-2deg); }
-  80% { transform: rotate(2deg); }
-  90% { transform: rotate(-1deg); }
-}
-
-.pochon-shake {
-  animation: pochon-shake 0.8s ease-in-out;
-}
-
-/* ─── Scanlines retro effect (very subtle) ─── */
-@keyframes game-scanline {
-  0% { transform: translateY(0); }
-  100% { transform: translateY(4px); }
-}
-
-.game-scanlines {
-  position: fixed;
   inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 0, 0, 0.03) 2px,
-    rgba(0, 0, 0, 0.03) 4px
-  );
-  animation: game-scanline 0.1s linear infinite;
+  backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.brutal-card-back {
+  transform: rotateY(180deg);
+}
+
+/* ─── Button press effect ─── */
+.brutal-btn {
+  border-radius: 0;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  transition: transform 80ms, box-shadow 80ms;
+  cursor: pointer;
+}
+
+.brutal-btn:hover:not(:disabled) {
+  transform: translate(-2px, -2px);
+}
+
+.brutal-btn:active:not(:disabled) {
+  transform: translate(4px, 4px);
+  box-shadow: 0px 0px 0px var(--brutal-violet) !important;
+}
+
+.brutal-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ─── Input ─── */
+.brutal-input {
+  border-radius: 0;
+  border: 2px solid var(--brutal-gray);
+  background: var(--brutal-bg);
+  color: var(--brutal-white);
+  padding: 16px 20px;
+  font-size: 1rem;
+  font-family: inherit;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.brutal-input:focus {
+  outline: none;
+  border-color: var(--brutal-violet);
+  box-shadow: 0 0 0 1px var(--brutal-violet);
+}
+
+.brutal-input::placeholder {
+  color: #555;
+}
+
+/* ─── Panel / Card container ─── */
+.brutal-panel {
+  border-radius: 0;
+  border: 2px solid var(--brutal-white);
+  background: var(--brutal-surface);
+  box-shadow: 4px 4px 0px var(--brutal-violet);
+}
+
+/* ─── Marquee ticker ─── */
+@keyframes brutal-marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.brutal-marquee {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.brutal-marquee-inner {
+  display: inline-block;
+  animation: brutal-marquee 25s linear infinite;
+}
+
+/* ─── Badge / sticker ─── */
+.brutal-badge {
+  display: inline-block;
+  border-radius: 0;
+  border: 2px solid var(--brutal-yellow);
+  background: var(--brutal-yellow);
+  color: #000;
+  padding: 4px 14px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  transform: rotate(-2deg);
 }
