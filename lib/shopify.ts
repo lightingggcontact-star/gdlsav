@@ -711,25 +711,33 @@ export async function searchProducts(query: string): Promise<ShopifyProductResul
   })
 }
 
-const ALL_PRODUCTS_QUERY = `
-  query AllProducts {
-    products(first: 250, query: "status:active") {
+// ─── Collections ───
+
+const LIST_COLLECTIONS_QUERY = `
+  query ListCollections {
+    collections(first: 100, sortKey: TITLE) {
       edges {
         node {
           id
           title
           handle
-          featuredImage {
-            url
-          }
+          productsCount { count }
         }
       }
     }
   }
 `
 
-export async function getAllProducts(): Promise<ShopifyProductResult[]> {
-  const response = await shopifyGraphQL(ALL_PRODUCTS_QUERY, {})
+export interface ShopifyCollection {
+  id: string
+  numericId: string
+  title: string
+  handle: string
+  productsCount: number
+}
+
+export async function listCollections(): Promise<ShopifyCollection[]> {
+  const response = await shopifyGraphQL(LIST_COLLECTIONS_QUERY, {})
 
   if (response.errors?.length) {
     throw new Error(
@@ -737,7 +745,49 @@ export async function getAllProducts(): Promise<ShopifyProductResult[]> {
     )
   }
 
-  const edges = (response.data as any)?.products?.edges ?? []
+  const edges = (response.data as any)?.collections?.edges ?? []
+
+  return edges.map((edge: any) => {
+    const node = edge.node
+    const gid = node.id as string
+    const numericId = gid.split("/").pop() ?? gid
+    return {
+      id: gid,
+      numericId,
+      title: node.title,
+      handle: node.handle,
+      productsCount: node.productsCount?.count ?? 0,
+    }
+  })
+}
+
+const COLLECTION_PRODUCTS_QUERY = `
+  query CollectionProducts($id: ID!) {
+    collection(id: $id) {
+      products(first: 250) {
+        edges {
+          node {
+            id
+            title
+            handle
+            featuredImage { url }
+          }
+        }
+      }
+    }
+  }
+`
+
+export async function getCollectionProducts(collectionGid: string): Promise<ShopifyProductResult[]> {
+  const response = await shopifyGraphQL(COLLECTION_PRODUCTS_QUERY, { id: collectionGid })
+
+  if (response.errors?.length) {
+    throw new Error(
+      `Shopify GraphQL errors: ${response.errors.map((e) => e.message).join(", ")}`
+    )
+  }
+
+  const edges = (response.data as any)?.collection?.products?.edges ?? []
 
   return edges.map((edge: any) => {
     const node = edge.node

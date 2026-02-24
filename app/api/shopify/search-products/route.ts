@@ -1,19 +1,27 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { searchProducts, getAllProducts } from "@/lib/shopify"
+import { searchProducts, listCollections, getCollectionProducts } from "@/lib/shopify"
 
 export const dynamic = "force-dynamic"
 
 export async function GET(request: NextRequest) {
   try {
-    const all = request.nextUrl.searchParams.get("all")
+    // List collections
+    const collections = request.nextUrl.searchParams.get("collections")
+    if (collections === "true") {
+      const result = await listCollections()
+      return NextResponse.json({ collections: result })
+    }
 
-    if (all === "true") {
-      const products = await getAllProducts()
+    // Get products from a collection
+    const collectionId = request.nextUrl.searchParams.get("collection")
+    if (collectionId) {
+      const gid = `gid://shopify/Collection/${collectionId}`
+      const products = await getCollectionProducts(gid)
       return NextResponse.json({ products })
     }
 
+    // Search products
     const q = request.nextUrl.searchParams.get("q")
-
     if (!q || q.trim().length < 2) {
       return NextResponse.json({ products: [] })
     }

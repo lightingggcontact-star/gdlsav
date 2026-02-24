@@ -206,7 +206,7 @@ export default function ProduitsPage() {
                         {v.thumbnailUrl ? (
                           <img src={v.thumbnailUrl} alt={v.name} className="h-full w-full object-cover" />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center text-xl">{v.emoji}</div>
+                          <div className="flex h-full w-full items-center justify-center"><Video className="h-5 w-5 text-muted-foreground" /></div>
                         )}
                       </div>
                     </div>
@@ -218,7 +218,7 @@ export default function ProduitsPage() {
                     </button>
                   </div>
                   <span className="text-[10px] text-muted-foreground max-w-[70px] truncate text-center">
-                    {v.emoji} {v.name}
+                    {v.name}
                   </span>
                 </div>
               ))}
@@ -263,11 +263,11 @@ export default function ProduitsPage() {
                         {v.thumbnail_url ? (
                           <img src={v.thumbnail_url} alt={v.name} className="h-full w-full object-cover" />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center text-sm">{v.emoji}</div>
+                          <div className="flex h-full w-full items-center justify-center"><Video className="h-4 w-4 text-muted-foreground" /></div>
                         )}
                       </div>
                       <span className="text-[13px] font-medium">
-                        {v.emoji} {v.name}
+                        {v.name}
                       </span>
                     </button>
                   )

@@ -13,6 +13,7 @@ import {
   X,
   Search,
   Loader2,
+  ChevronDown,
 } from "lucide-react"
 import { useSupabase } from "@/lib/supabase/use-supabase"
 import type { StoryVideo } from "@/lib/types"
@@ -24,23 +25,34 @@ interface ProductTag {
 
 // ─── Product Search Input ───
 
+interface CollectionItem {
+  id: string
+  numericId: string
+  title: string
+  productsCount: number
+}
+
 function ProductSearchInput({
   selected,
   onAdd,
   onRemove,
-  onSelectAll,
+  onBulkAdd,
 }: {
   selected: ProductTag[]
   onAdd: (p: ProductTag) => void
   onRemove: (id: string) => void
-  onSelectAll: (products: ProductTag[]) => void
+  onBulkAdd: (products: ProductTag[]) => void
 }) {
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<ProductTag[]>([])
   const [searching, setSearching] = useState(false)
-  const [loadingAll, setLoadingAll] = useState(false)
   const [open, setOpen] = useState(false)
   const timerRef = useRef<number | null>(null)
+
+  // Collection picker
+  const [collections, setCollections] = useState<CollectionItem[]>([])
+  const [collectionOpen, setCollectionOpen] = useState(false)
+  const [loadingCollection, setLoadingCollection] = useState(false)
 
   useEffect(() => {
     if (query.length < 2) {
@@ -67,20 +79,39 @@ function ProductSearchInput({
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
   }, [query])
 
-  async function handleSelectAll() {
-    setLoadingAll(true)
+  async function handleOpenCollections() {
+    if (collections.length > 0) {
+      setCollectionOpen(!collectionOpen)
+      return
+    }
+    setLoadingCollection(true)
     try {
-      const res = await fetch("/api/shopify/search-products?all=true")
+      const res = await fetch("/api/shopify/search-products?collections=true")
       const data = await res.json()
-      const all: ProductTag[] = (data.products ?? []).map((p: any) => ({
-        id: p.numericId,
-        title: p.title,
-      }))
-      onSelectAll(all)
+      setCollections(data.collections ?? [])
+      setCollectionOpen(true)
     } catch {
       // silent
     } finally {
-      setLoadingAll(false)
+      setLoadingCollection(false)
+    }
+  }
+
+  async function handlePickCollection(col: CollectionItem) {
+    setCollectionOpen(false)
+    setLoadingCollection(true)
+    try {
+      const res = await fetch(`/api/shopify/search-products?collection=${col.numericId}`)
+      const data = await res.json()
+      const products: ProductTag[] = (data.products ?? []).map((p: any) => ({
+        id: p.numericId,
+        title: p.title,
+      }))
+      onBulkAdd(products)
+    } catch {
+      // silent
+    } finally {
+      setLoadingCollection(false)
     }
   }
 
@@ -119,13 +150,31 @@ function ProductSearchInput({
             </div>
           )}
         </div>
-        <button
-          onClick={handleSelectAll}
-          disabled={loadingAll}
-          className="shrink-0 rounded-lg border border-border px-3 py-2 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
-        >
-          {loadingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Tous"}
-        </button>
+        <div className="relative">
+          <button
+            onClick={handleOpenCollections}
+            disabled={loadingCollection}
+            className="flex shrink-0 items-center gap-1 rounded-lg border border-border px-3 py-2 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+          >
+            {loadingCollection ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : (
+              <>Collection <ChevronDown className="h-3 w-3" /></>
+            )}
+          </button>
+          {collectionOpen && collections.length > 0 && (
+            <div className="absolute top-full right-0 z-50 mt-1 w-56 max-h-60 overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
+              {collections.map((col) => (
+                <button
+                  key={col.numericId}
+                  onClick={() => handlePickCollection(col)}
+                  className="block w-full px-3 py-2 text-left text-[12px] hover:bg-secondary transition-colors"
+                >
+                  <span className="font-medium">{col.title}</span>
+                  <span className="ml-1 text-muted-foreground">({col.productsCount})</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
@@ -238,7 +287,6 @@ export default function VideosPage() {
   // Edit state (single video)
   const [uploading, setUploading] = useState(false)
   const [uploadName, setUploadName] = useState("")
-  const [uploadEmoji, setUploadEmoji] = useState("🎬")
   const [uploadProducts, setUploadProducts] = useState<ProductTag[]>([])
   const [editFile, setEditFile] = useState<File | null>(null)
   const [editPreview, setEditPreview] = useState<string | null>(null)
@@ -263,7 +311,6 @@ export default function VideosPage() {
 
   function resetDialog() {
     setUploadName("")
-    setUploadEmoji("🎬")
     setUploadProducts([])
     setEditFile(null)
     setEditPreview(null)
@@ -322,7 +369,7 @@ export default function VideosPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name,
-        emoji: "🎬",
+        emoji: "",
         video_url: videoUrl,
         thumbnail_url: thumbnailUrl,
         products: [],
@@ -389,7 +436,7 @@ export default function VideosPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: uploadName,
-          emoji: uploadEmoji,
+          emoji: "",
           video_url: videoUrl,
           thumbnail_url: thumbnailUrl,
           products: uploadProducts.map((p) => ({ id: p.id, title: p.title })),
@@ -414,7 +461,6 @@ export default function VideosPage() {
   function handleEdit(video: StoryVideo) {
     setEditingVideo(video)
     setUploadName(video.name)
-    setUploadEmoji(video.emoji)
     setEditFile(null)
     setEditPreview(video.thumbnail_url)
     setUploadProducts(
@@ -499,8 +545,8 @@ export default function VideosPage() {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-lg">
-                    {video.emoji}
+                  <div className="flex h-full w-full items-center justify-center">
+                    <Video className="h-5 w-5 text-muted-foreground" />
                   </div>
                 )}
               </div>
@@ -508,7 +554,7 @@ export default function VideosPage() {
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-medium text-foreground truncate">
-                  {video.emoji} {video.name}
+                  {video.name}
                 </p>
                 <div className="flex flex-wrap gap-1 mt-0.5">
                   {video.stories_video_products.map((p) => (
@@ -719,17 +765,6 @@ export default function VideosPage() {
                 />
               </div>
 
-              {/* Emoji */}
-              <div>
-                <label className="mb-1 block text-[12px] font-medium text-foreground">Emoji</label>
-                <input
-                  type="text"
-                  value={uploadEmoji}
-                  onChange={(e) => setUploadEmoji(e.target.value)}
-                  className="w-20 rounded-lg border border-border bg-background px-3 py-2 text-center text-[16px] outline-none focus:border-[#007AFF]"
-                />
-              </div>
-
               {/* Produits */}
               <div>
                 <label className="mb-1 block text-[12px] font-medium text-foreground">
@@ -739,7 +774,12 @@ export default function VideosPage() {
                   selected={uploadProducts}
                   onAdd={(p) => setUploadProducts((prev) => [...prev, p])}
                   onRemove={(id) => setUploadProducts((prev) => prev.filter((p) => p.id !== id))}
-                  onSelectAll={(all) => setUploadProducts(all)}
+                  onBulkAdd={(products) => {
+                    setUploadProducts((prev) => {
+                      const ids = new Set(prev.map((p) => p.id))
+                      return [...prev, ...products.filter((p) => !ids.has(p.id))]
+                    })
+                  }}
                 />
               </div>
 
