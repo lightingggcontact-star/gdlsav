@@ -26,8 +26,20 @@ const LP_BADGE: Record<string, { label: string; cls: string }> = {
 
 function formatCurrency(amount: string): string {
   const n = parseFloat(amount)
-  if (isNaN(n)) return "0,00 €"
+  if (isNaN(n)) return "0,00 \u20AC"
   return n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })
+}
+
+function relativeDate(dateStr: string): string {
+  const d = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now.getTime() - d.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  if (diffDays === 0) return "Aujourd'hui"
+  if (diffDays === 1) return "Hier"
+  if (diffDays < 7) return `il y a ${diffDays}j`
+  if (diffDays < 30) return `il y a ${Math.floor(diffDays / 7)} sem.`
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })
 }
 
 interface KanbanCardProps {
@@ -74,13 +86,24 @@ export const KanbanCard = React.memo(function KanbanCard({
         <span className="text-[12px] font-medium text-[#007AFF]">{formatCurrency(renvoi.orderTotal)}</span>
       </div>
 
-      {/* Row 2: customer */}
-      <p className="text-[12px] text-muted-foreground truncate mt-0.5">{renvoi.customerName}</p>
+      {/* Row 2: customer + date */}
+      <div className="flex items-center justify-between mt-0.5">
+        <p className="text-[12px] text-muted-foreground truncate flex-1">{renvoi.customerName}</p>
+        <span className="text-[10px] text-muted-foreground/60 ml-2 shrink-0">{relativeDate(renvoi.renvoiDate)}</span>
+      </div>
 
-      {/* Row 3: reason */}
-      <div className="flex items-center gap-1.5 mt-1.5">
-        <span className="text-[13px]">{getReasonEmoji(renvoi.reason)}</span>
-        <span className="text-[11px] text-muted-foreground">{getReasonLabel(renvoi.reason)}</span>
+      {/* Row 3: reason + colis revenu */}
+      <div className="flex items-center justify-between mt-1.5">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[13px]">{getReasonEmoji(renvoi.reason)}</span>
+          <span className="text-[11px] text-muted-foreground">{getReasonLabel(renvoi.reason)}</span>
+        </div>
+        {renvoi.colisRevenu && (
+          <div className="flex items-center gap-1">
+            <PackageCheck className="h-3 w-3 text-emerald-600" />
+            <span className="text-[10px] text-emerald-600 font-medium">Revenu</span>
+          </div>
+        )}
       </div>
 
       {/* Row 4: tracking + La Poste badge */}
@@ -102,14 +125,6 @@ export const KanbanCard = React.memo(function KanbanCard({
         <p className="text-[11px] text-muted-foreground/80 italic mt-1.5 line-clamp-1">
           &ldquo;{renvoi.note.slice(0, 60)}{renvoi.note.length > 60 ? "..." : ""}&rdquo;
         </p>
-      )}
-
-      {/* Colis revenu indicator */}
-      {renvoi.colisRevenu && (
-        <div className="flex items-center gap-1 mt-1.5">
-          <PackageCheck className="h-3 w-3 text-emerald-600" />
-          <span className="text-[10px] text-emerald-600 font-medium">Colis revenu</span>
-        </div>
       )}
     </div>
   )

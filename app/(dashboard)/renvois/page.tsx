@@ -164,8 +164,8 @@ export default function RenvoisPage() {
           <Skeleton className="h-7 w-32" />
           <Skeleton className="h-9 w-36" />
         </div>
-        <div className="grid grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
         </div>
         <div className="flex gap-4">
           {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="flex-1 h-96 rounded-xl" />)}
@@ -180,7 +180,10 @@ export default function RenvoisPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Renvois</h1>
+        <div>
+          <h1 className="text-xl font-semibold">Renvois</h1>
+          <p className="text-[13px] text-muted-foreground mt-0.5">Suivi des commandes renvoyees aux clients</p>
+        </div>
         <Button size="sm" onClick={() => setShowCreate(true)} className="gap-2 bg-[#007AFF] hover:bg-[#0066DD]">
           <Plus className="h-4 w-4" />
           Nouveau renvoi

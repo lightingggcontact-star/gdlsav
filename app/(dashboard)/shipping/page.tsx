@@ -29,7 +29,7 @@ interface ShippingResponse {
 }
 
 // Which statuses belong to which group filter
-const ACTION_STATUSES: Set<ShippingStatus> = new Set(["problem", "returned", "delayed"])
+const ACTION_STATUSES: Set<ShippingStatus> = new Set(["problem", "returned"])
 const PROGRESS_STATUSES: Set<ShippingStatus> = new Set(["in_transit", "out_for_delivery", "pickup_ready"])
 
 export default function ShippingPage() {

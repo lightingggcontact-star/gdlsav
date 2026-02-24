@@ -40,6 +40,7 @@ interface ShippingFiltersProps {
 const mainOptions: { value: AlertFilter; label: string }[] = [
   { value: "all", label: "Tous" },
   { value: "action_needed", label: "A traiter" },
+  { value: "delayed", label: "En retard" },
   { value: "in_progress", label: "En cours" },
   { value: "delivered", label: "Livrés" },
 ]
@@ -47,7 +48,6 @@ const mainOptions: { value: AlertFilter; label: string }[] = [
 // Sub-filter chips for "A traiter" group
 const actionSubFilters: { value: AlertFilter; label: string }[] = [
   { value: "problem", label: "Problèmes" },
-  { value: "delayed", label: "Retards" },
   { value: "returned", label: "Retournés" },
 ]
 
@@ -62,7 +62,8 @@ function getMainCount(value: AlertFilter, counts?: ShippingStatsData): number | 
   if (!counts) return undefined
   switch (value) {
     case "all": return counts.total
-    case "action_needed": return counts.problem + counts.returned + counts.delayed
+    case "action_needed": return counts.problem + counts.returned
+    case "delayed": return counts.delayed
     case "in_progress": return counts.in_transit + counts.out_for_delivery + counts.pickup_ready
     case "delivered": return counts.delivered
     default: return undefined
@@ -90,7 +91,7 @@ const countryOptions: { value: CountryFilter; label: string }[] = [
 
 // Determine which main group a filter belongs to
 function getActiveGroup(filter: AlertFilter): "action_needed" | "in_progress" | null {
-  if (filter === "action_needed" || filter === "problem" || filter === "delayed" || filter === "returned") return "action_needed"
+  if (filter === "action_needed" || filter === "problem" || filter === "returned") return "action_needed"
   if (filter === "in_progress" || filter === "in_transit" || filter === "out_for_delivery" || filter === "pickup_ready") return "in_progress"
   return null
 }
@@ -139,7 +140,8 @@ export function ShippingFilters({
         onAlertFilterChange("in_progress")
       }
     } else {
-      onAlertFilterChange(value)
+      // Toggle: clicking the active filter goes back to "all"
+      onAlertFilterChange(alertFilter === value ? "all" : value)
     }
   }
 

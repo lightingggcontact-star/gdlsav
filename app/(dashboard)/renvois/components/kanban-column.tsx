@@ -61,14 +61,19 @@ export function KanbanColumn({
           <Icon className={cn("h-3.5 w-3.5", color)} />
         </div>
         <span className="text-[13px] font-semibold">{label}</span>
-        <span className="text-[11px] text-muted-foreground ml-auto">({renvois.length})</span>
+        {renvois.length > 0 && (
+          <span className={cn("text-[11px] font-medium ml-auto px-1.5 py-0.5 rounded-full", bgColor, color)}>
+            {renvois.length}
+          </span>
+        )}
       </div>
 
       {/* Cards */}
       <div className="flex-1 overflow-y-auto p-2 space-y-2 max-h-[calc(100vh-300px)]">
         {renvois.length === 0 && (
-          <div className="text-center py-8 text-[12px] text-muted-foreground/60">
-            Aucun renvoi
+          <div className="flex flex-col items-center justify-center py-10 text-muted-foreground/40">
+            <Icon className="h-6 w-6 mb-2" />
+            <span className="text-[12px]">Aucun renvoi</span>
           </div>
         )}
         {renvois.map((r) => (

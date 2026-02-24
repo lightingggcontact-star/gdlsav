@@ -1,6 +1,6 @@
 "use client"
 
-import { type LucideIcon, AlertTriangle, Truck, PackageCheck, BarChart3 } from "lucide-react"
+import { type LucideIcon, AlertTriangle, Clock, Truck, PackageCheck, BarChart3 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface StatCardProps {
@@ -111,12 +111,11 @@ function buildSubtitle(parts: { count: number; label: string }[]): string {
 }
 
 export function ShippingStats({ stats }: ShippingStatsProps) {
-  const actionNeeded = stats.problem + stats.returned + stats.delayed
+  const actionNeeded = stats.problem + stats.returned
   const inProgress = stats.in_transit + stats.out_for_delivery + stats.pickup_ready
 
   const actionSubtitle = buildSubtitle([
     { count: stats.problem, label: "probl." },
-    { count: stats.delayed, label: "retards" },
     { count: stats.returned, label: "retours" },
   ])
 
@@ -127,8 +126,9 @@ export function ShippingStats({ stats }: ShippingStatsProps) {
   ])
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
       <StatCard label="A traiter" value={actionNeeded} total={stats.total} icon={AlertTriangle} color="red" subtitle={actionSubtitle} />
+      <StatCard label="En retard" value={stats.delayed} total={stats.total} icon={Clock} color="orange" />
       <StatCard label="En cours" value={inProgress} total={stats.total} icon={Truck} color="blue" subtitle={progressSubtitle} />
       <StatCard label="Livrés" value={stats.delivered} total={stats.total} icon={PackageCheck} color="green" />
       <StatCard label="Total" value={stats.total} total={stats.total} icon={BarChart3} color="neutral" />

@@ -25,6 +25,17 @@ interface KanbanBoardProps {
   onStatusChange: (id: string, newStatus: RenvoiStatus) => void
 }
 
+function sortRenvois(renvois: Renvoi[], status: RenvoiStatus): Renvoi[] {
+  return [...renvois].sort((a, b) => {
+    const da = new Date(a.renvoiDate).getTime()
+    const db = new Date(b.renvoiDate).getTime()
+    // "A traiter": oldest first (most urgent on top)
+    if (status === "en_cours") return da - db
+    // Others: newest first
+    return db - da
+  })
+}
+
 export function KanbanBoard({ renvois, trackingMap, onCardClick, onStatusChange }: KanbanBoardProps) {
   const [draggedId, setDraggedId] = useState<string | null>(null)
 
@@ -41,7 +52,6 @@ export function KanbanBoard({ renvois, trackingMap, onCardClick, onStatusChange 
 
   function handleDrop(renvoiId: string, newStatus: RenvoiStatus) {
     setDraggedId(null)
-    // Find the renvoi to check if status actually changed
     const renvoi = renvois.find((r) => r.id === renvoiId)
     if (renvoi && renvoi.status !== newStatus) {
       onStatusChange(renvoiId, newStatus)
@@ -58,7 +68,7 @@ export function KanbanBoard({ renvois, trackingMap, onCardClick, onStatusChange 
           icon={col.icon}
           color={col.color}
           bgColor={col.bgColor}
-          renvois={grouped[col.status]}
+          renvois={sortRenvois(grouped[col.status], col.status)}
           trackingMap={trackingMap}
           onCardClick={onCardClick}
           onDrop={handleDrop}
