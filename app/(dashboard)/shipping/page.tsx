@@ -202,19 +202,15 @@ export default function ShippingPage() {
     }
   }
 
-  // Derive effective status: La Poste when available, fallback to enriched
+  // Derive effective status: La Poste is the single source of truth
   const getEffectiveStatus = useCallback((order: EnrichedOrder): ShippingStatus => {
     const lp = order.trackingNumber ? trackingMap[order.trackingNumber] : undefined
-    if (lp && lp.statusSummary !== "unknown") {
-      return deriveShippingStatus(
-        lp.statusSummary,
-        order.shipmentStatus,
-        order.businessDaysElapsed,
-        order.countryCode,
-        thresholds
-      )
-    }
-    return order.alertLevel
+    return deriveShippingStatus(
+      lp?.statusSummary,
+      order.businessDaysElapsed,
+      order.countryCode,
+      thresholds
+    )
   }, [trackingMap, thresholds])
 
   // Filter logic supporting group and individual filters

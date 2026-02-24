@@ -124,37 +124,31 @@ export function getShippingStatusConfig(status: ShippingStatus | "unknown"): Shi
 }
 
 /**
- * Derive shipping status from La Poste status, Shopify status, and business days.
+ * Derive shipping status from La Poste status ONLY.
+ * La Poste is the single source of truth.
+ * If La Poste says in_transit and business days > threshold → delayed.
+ * If no La Poste data → defaults to "in_transit".
  */
 export function deriveShippingStatus(
   laPosteStatus: ShippingStatus | "unknown" | undefined,
-  shipmentStatus: string | null,
   businessDays: number,
   countryCode: string,
   thresholds: ShippingThresholds
 ): ShippingStatus {
-  // If La Poste gives us a real status, use it (with delay override)
-  if (laPosteStatus && laPosteStatus !== "unknown") {
-    // If La Poste says in_transit but we're past threshold → delayed
-    if (laPosteStatus === "in_transit") {
-      const threshold = countryCode === "BE" ? thresholds.be : thresholds.fr
-      if (businessDays > threshold) return "delayed"
-    }
-    return laPosteStatus
+  // No La Poste data → just in_transit (we wait for La Poste to tell us)
+  if (!laPosteStatus || laPosteStatus === "unknown") {
+    const threshold = countryCode === "BE" ? thresholds.be : thresholds.fr
+    if (businessDays > threshold) return "delayed"
+    return "in_transit"
   }
 
-  // Fallback: Shopify status
-  if (shipmentStatus === "DELIVERED" || shipmentStatus === "READY_FOR_PICKUP") {
-    return "delivered"
+  // La Poste says in_transit but past threshold → delayed
+  if (laPosteStatus === "in_transit") {
+    const threshold = countryCode === "BE" ? thresholds.be : thresholds.fr
+    if (businessDays > threshold) return "delayed"
   }
 
-  // Check delay threshold based on country
-  const threshold = countryCode === "BE" ? thresholds.be : thresholds.fr
-  if (businessDays > threshold) {
-    return "delayed"
-  }
-
-  return "in_transit"
+  return laPosteStatus
 }
 
 /**
@@ -176,7 +170,6 @@ export function enrichOrders(
 
     const alertLevel = deriveShippingStatus(
       undefined,
-      shipmentStatus,
       businessDays,
       countryCode,
       thresholds
