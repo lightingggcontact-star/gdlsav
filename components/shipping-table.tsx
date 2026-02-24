@@ -132,50 +132,29 @@ function ActionButton({
   return btn
 }
 
-const BOLD_KEYWORDS = [
-  "livré", "distribué", "destinataire", "point relais", "point de retrait",
-  "mis à disposition", "mise à disposition", "boîte aux lettres", "avis de passage",
-  "retourné", "retour", "incomplet", "incomplete", "incomplète", "refusé",
-  "problème", "anomalie", "erreur", "perdu", "égaré",
-  "en cours d'acheminement", "pris en charge", "dédouanement",
+// Extract a short keyword from La Poste event label
+const EVENT_KEYWORDS: [RegExp, string][] = [
+  [/distribu|livr[eé]/i, "Distribué"],
+  [/point relais|point de retrait|mise? [àa] disposition/i, "Point relais"],
+  [/bo[iî]te aux lettres/i, "Boîte aux lettres"],
+  [/avis de passage/i, "Avis de passage"],
+  [/acheminement/i, "En acheminement"],
+  [/pris en charge/i, "Pris en charge"],
+  [/pr[eê]t [àa] partir|quitt/i, "Expédié"],
+  [/d[eé]douanement|douane/i, "En douane"],
+  [/incompl[eè]t/i, "Adresse incomplète"],
+  [/retour|renvoy/i, "Retour expéditeur"],
+  [/refus[eé]/i, "Refusé"],
+  [/perdu|[eé]gar[eé]/i, "Colis perdu"],
+  [/anomalie|probl[eè]me|erreur/i, "Anomalie"],
 ]
 
-function highlightEvent(text: string): React.ReactNode {
+function extractKeyPhrase(text: string): string | null {
   if (!text) return null
-  const lower = text.toLowerCase()
-  const parts: { start: number; end: number }[] = []
-
-  for (const kw of BOLD_KEYWORDS) {
-    let idx = lower.indexOf(kw)
-    while (idx !== -1) {
-      parts.push({ start: idx, end: idx + kw.length })
-      idx = lower.indexOf(kw, idx + 1)
-    }
+  for (const [re, label] of EVENT_KEYWORDS) {
+    if (re.test(text)) return label
   }
-
-  if (parts.length === 0) return text
-
-  // Merge overlapping
-  parts.sort((a, b) => a.start - b.start)
-  const merged: { start: number; end: number }[] = [parts[0]]
-  for (let i = 1; i < parts.length; i++) {
-    const last = merged[merged.length - 1]
-    if (parts[i].start <= last.end) {
-      last.end = Math.max(last.end, parts[i].end)
-    } else {
-      merged.push(parts[i])
-    }
-  }
-
-  const result: React.ReactNode[] = []
-  let cursor = 0
-  for (const { start, end } of merged) {
-    if (cursor < start) result.push(text.slice(cursor, start))
-    result.push(<strong key={start} className="font-semibold text-foreground">{text.slice(start, end)}</strong>)
-    cursor = end
-  }
-  if (cursor < text.length) result.push(text.slice(cursor))
-  return result
+  return null
 }
 
 export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds, onSelectionChange, segments, orderNotes = {}, thresholds }: ShippingTableProps) {
@@ -316,7 +295,7 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
   return (
     <div className="space-y-3">
       <div className={cn("rounded-lg border border-border overflow-hidden bg-card shadow-[0_1px_0_0_rgba(0,0,0,.05)]", isDragging && "select-none")}>
-        <Table className="table-fixed">
+        <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-b border-border">
               <TableHead className="w-10">
@@ -326,12 +305,12 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
                   aria-label="Tout sélectionner"
                 />
               </TableHead>
-              <SortHeader label="Commande" sortKeyName="orderName" className="w-[12%]" />
-              <SortHeader label="Client" sortKeyName="customerName" className="w-[20%]" />
-              <SortHeader label="Expédié" sortKeyName="shippedAt" className="w-[10%]" />
-              <SortHeader label="Durée" sortKeyName="businessDaysElapsed" className="w-[10%]" />
+              <SortHeader label="Commande" sortKeyName="orderName" />
+              <SortHeader label="Client" sortKeyName="customerName" />
+              <SortHeader label="Expédié" sortKeyName="shippedAt" />
+              <SortHeader label="Durée" sortKeyName="businessDaysElapsed" />
               <SortHeader label="Statut" sortKeyName="alertLevel" />
-              <TableHead className="w-20" />
+              <TableHead className="w-25" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -438,23 +417,37 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
                     <DurationBar days={order.businessDaysElapsed} effectiveStatus={effectiveStatus} threshold={threshold} />
                   </TableCell>
 
-                  {/* Statut + La Poste detail */}
+                  {/* Statut + keyword */}
                   <TableCell>
-                    <div className="space-y-1">
-                      <Badge variant="outline" className={cn("text-[10px] font-medium", statusConfig.badgeClassName)}>
-                        {statusConfig.label}
-                      </Badge>
-                      {tracking?.lastEventLabel && (
-                        <p className="text-[11px] text-muted-foreground leading-relaxed">
-                          {highlightEvent(tracking.lastEventLabel)}
-                          {tracking.lastEventDate && (
-                            <span className="text-[10px] text-muted-foreground/50 ml-1">
-                              — {new Date(tracking.lastEventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
-                            </span>
+                    <Tooltip>
+                      <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <div className="space-y-0.5 cursor-default">
+                          <Badge variant="outline" className={cn("text-[10px] font-medium", statusConfig.badgeClassName)}>
+                            {statusConfig.label}
+                          </Badge>
+                          {tracking?.lastEventLabel && (
+                            <p className="text-[11px] text-muted-foreground">
+                              <span className="font-medium text-foreground">{extractKeyPhrase(tracking.lastEventLabel) ?? tracking.lastEventLabel.slice(0, 30)}</span>
+                              {tracking.lastEventDate && (
+                                <span className="text-muted-foreground/50 ml-1 text-[10px]">
+                                  {new Date(tracking.lastEventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                                </span>
+                              )}
+                            </p>
                           )}
-                        </p>
+                        </div>
+                      </TooltipTrigger>
+                      {tracking?.lastEventLabel && (
+                        <TooltipContent side="left" className="max-w-72 text-[12px]">
+                          <p>{tracking.lastEventLabel}</p>
+                          {tracking.lastEventDate && (
+                            <p className="text-[11px] opacity-60 mt-0.5">
+                              {new Date(tracking.lastEventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                          )}
+                        </TooltipContent>
                       )}
-                    </div>
+                    </Tooltip>
                   </TableCell>
 
                   {/* Action icons — always visible */}
