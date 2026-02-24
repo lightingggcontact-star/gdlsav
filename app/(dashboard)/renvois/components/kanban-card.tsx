@@ -1,7 +1,6 @@
 "use client"
 
 import React from "react"
-import { PackageCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getReasonEmoji, getReasonLabel } from "@/lib/renvois"
 import type { Renvoi, LaPosteTracking } from "@/lib/types"
@@ -46,38 +45,25 @@ interface KanbanCardProps {
   renvoi: Renvoi
   tracking?: LaPosteTracking
   onClick: () => void
-  onDragStart: (id: string) => void
-  onDragEnd: () => void
-  isDragging: boolean
 }
 
 export const KanbanCard = React.memo(function KanbanCard({
   renvoi,
   tracking,
   onClick,
-  onDragStart,
-  onDragEnd,
-  isDragging,
 }: KanbanCardProps) {
   const borderColor = REASON_BORDER[renvoi.reason] ?? "border-l-gray-400"
   const lpStatus = tracking?.statusSummary
   const lpBadge = lpStatus && lpStatus !== "unknown" ? LP_BADGE[lpStatus] : null
+  const needsTracking = renvoi.status === "a_renvoyer" && !renvoi.trackingNumber
 
   return (
     <div
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = "move"
-        e.dataTransfer.setData("text/plain", renvoi.id)
-        onDragStart(renvoi.id)
-      }}
-      onDragEnd={onDragEnd}
       onClick={onClick}
       className={cn(
-        "rounded-lg border border-border border-l-[3px] bg-card p-3 cursor-grab active:cursor-grabbing",
+        "rounded-lg border border-border border-l-[3px] bg-card p-3 cursor-pointer",
         "hover:shadow-md transition-shadow select-none",
         borderColor,
-        isDragging && "opacity-50"
       )}
     >
       {/* Row 1: order + price */}
@@ -92,24 +78,16 @@ export const KanbanCard = React.memo(function KanbanCard({
         <span className="text-[10px] text-muted-foreground/60 ml-2 shrink-0">{relativeDate(renvoi.renvoiDate)}</span>
       </div>
 
-      {/* Row 3: reason + colis revenu */}
-      <div className="flex items-center justify-between mt-1.5">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[13px]">{getReasonEmoji(renvoi.reason)}</span>
-          <span className="text-[11px] text-muted-foreground">{getReasonLabel(renvoi.reason)}</span>
-        </div>
-        {renvoi.colisRevenu && (
-          <div className="flex items-center gap-1">
-            <PackageCheck className="h-3 w-3 text-emerald-600" />
-            <span className="text-[10px] text-emerald-600 font-medium">Revenu</span>
-          </div>
-        )}
+      {/* Row 3: reason */}
+      <div className="flex items-center gap-1.5 mt-1.5">
+        <span className="text-[13px]">{getReasonEmoji(renvoi.reason)}</span>
+        <span className="text-[11px] text-muted-foreground">{getReasonLabel(renvoi.reason)}</span>
       </div>
 
-      {/* Row 4: tracking + La Poste badge */}
-      {renvoi.trackingNumber && (
+      {/* Row 4: tracking or "ajouter tracking" hint */}
+      {renvoi.trackingNumber ? (
         <div className="flex items-center gap-2 mt-1.5">
-          <span className="text-[11px] font-mono text-muted-foreground truncate max-w-[120px]">
+          <span className="text-[11px] font-mono text-muted-foreground truncate max-w-30">
             {renvoi.trackingNumber}
           </span>
           {lpBadge && (
@@ -118,7 +96,11 @@ export const KanbanCard = React.memo(function KanbanCard({
             </span>
           )}
         </div>
-      )}
+      ) : needsTracking ? (
+        <div className="mt-2 text-[11px] text-amber-600 font-medium">
+          Ajouter le numero de suivi →
+        </div>
+      ) : null}
 
       {/* Row 5: note preview */}
       {renvoi.note && (

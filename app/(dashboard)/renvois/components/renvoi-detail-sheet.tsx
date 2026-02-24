@@ -4,16 +4,13 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import {
   Package,
   Truck,
-  Check,
-  Clock,
-  XCircle,
   ExternalLink,
   Save,
-  PackageCheck,
   Trash2,
   Loader2,
   CircleCheck,
   AlertTriangle,
+  Clock,
   Undo2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -27,8 +24,8 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
-import { getReasonLabel, getReasonEmoji, STATUS_OPTIONS } from "@/lib/renvois"
-import type { Renvoi, RenvoiStatus, LaPosteTracking } from "@/lib/types"
+import { getReasonLabel, getReasonEmoji, getStatusOption } from "@/lib/renvois"
+import type { Renvoi, LaPosteTracking } from "@/lib/types"
 
 // ─── La Poste status config ──────────────────────────
 const LP_STATUS: Record<string, { label: string; icon: React.ElementType; bg: string; text: string }> = {
@@ -43,14 +40,14 @@ const LP_STATUS: Record<string, { label: string; icon: React.ElementType; bg: st
 }
 
 function formatDate(dateStr: string): string {
-  if (!dateStr) return "—"
+  if (!dateStr) return "\u2014"
   const d = new Date(dateStr)
   return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })
 }
 
 function formatCurrency(amount: string): string {
   const n = parseFloat(amount)
-  if (isNaN(n)) return "0,00 €"
+  if (isNaN(n)) return "0,00 \u20AC"
   return n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })
 }
 
@@ -60,10 +57,8 @@ interface RenvoiDetailSheetProps {
   onOpenChange: (open: boolean) => void
   tracking?: LaPosteTracking
   trackingLoading?: boolean
-  onStatusChange: (id: string, status: RenvoiStatus) => void
   onTrackingChange: (id: string, tracking: string) => void
   onNoteChange: (id: string, note: string) => void
-  onColisRevenuToggle: (id: string, value: boolean) => void
   onDelete: (id: string) => void
 }
 
@@ -73,10 +68,8 @@ export function RenvoiDetailSheet({
   onOpenChange,
   tracking,
   trackingLoading,
-  onStatusChange,
   onTrackingChange,
   onNoteChange,
-  onColisRevenuToggle,
   onDelete,
 }: RenvoiDetailSheetProps) {
   const [editingTracking, setEditingTracking] = useState(false)
@@ -89,7 +82,7 @@ export function RenvoiDetailSheet({
     if (renvoi) {
       setTrackingInput(renvoi.trackingNumber)
       setNoteInput(renvoi.note)
-      setEditingTracking(false)
+      setEditingTracking(!renvoi.trackingNumber) // auto-open tracking input if empty
     }
   }, [renvoi?.id, renvoi?.trackingNumber, renvoi?.note])
 
@@ -110,12 +103,14 @@ export function RenvoiDetailSheet({
   }
 
   function saveTracking() {
-    if (!renvoi) return
-    onTrackingChange(renvoi.id, trackingInput)
+    if (!renvoi || !trackingInput.trim()) return
+    onTrackingChange(renvoi.id, trackingInput.trim())
     setEditingTracking(false)
   }
 
   if (!renvoi) return null
+
+  const statusOpt = getStatusOption(renvoi.status)
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -127,45 +122,19 @@ export function RenvoiDetailSheet({
           </SheetTitle>
           <SheetDescription>
             {renvoi.customerName}
-            {renvoi.customerEmail && ` — ${renvoi.customerEmail}`}
+            {renvoi.customerEmail && ` \u2014 ${renvoi.customerEmail}`}
             <br />
             {formatCurrency(renvoi.orderTotal)} · {formatDate(renvoi.renvoiDate)}
           </SheetDescription>
         </SheetHeader>
 
         <div className="px-4 pb-6 space-y-5">
-          {/* ─── Status pills ─── */}
-          <div>
-            <label className="text-[12px] font-medium text-muted-foreground mb-2 block">Statut</label>
-            <div className="flex gap-2 flex-wrap">
-              {STATUS_OPTIONS.map((s) => {
-                const isActive = renvoi.status === s.value
-                return (
-                  <button
-                    key={s.value}
-                    onClick={() => onStatusChange(renvoi.id, s.value)}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors border",
-                      isActive
-                        ? cn(s.bg, s.text, "border-current")
-                        : "bg-secondary/50 text-muted-foreground border-transparent hover:bg-secondary"
-                    )}
-                  >
-                    {s.value === "en_cours" && <Clock className="h-3 w-3" />}
-                    {s.value === "expedie" && <Truck className="h-3 w-3" />}
-                    {s.value === "livre" && <Check className="h-3 w-3" />}
-                    {s.value === "annule" && <XCircle className="h-3 w-3" />}
-                    {s.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* ─── Raison ─── */}
-          <div className="flex items-center gap-2">
-            <span className="text-[14px]">{getReasonEmoji(renvoi.reason)}</span>
-            <span className="text-[13px] font-medium">{getReasonLabel(renvoi.reason)}</span>
+          {/* ─── Status badge ─── */}
+          <div className="flex items-center gap-3">
+            <span className={cn("inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold", statusOpt.bg, statusOpt.text)}>
+              {statusOpt.label}
+            </span>
+            <span className="text-[13px]">{getReasonEmoji(renvoi.reason)} {getReasonLabel(renvoi.reason)}</span>
           </div>
 
           {/* ─── Tracking ─── */}
@@ -175,48 +144,52 @@ export function RenvoiDetailSheet({
                 <Truck className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="text-[12px] font-medium text-muted-foreground">Suivi du renvoi</span>
               </div>
-              {!editingTracking && (
+              {!editingTracking && renvoi.trackingNumber && (
                 <button
                   onClick={() => { setTrackingInput(renvoi.trackingNumber); setEditingTracking(true) }}
                   className="text-[11px] text-[#007AFF] hover:underline"
                 >
-                  {renvoi.trackingNumber ? "Modifier" : "Ajouter"}
+                  Modifier
                 </button>
               )}
             </div>
 
             {editingTracking ? (
-              <div className="flex items-center gap-2">
-                <Input
-                  value={trackingInput}
-                  onChange={(e) => setTrackingInput(e.target.value)}
-                  placeholder="Numero de suivi..."
-                  className="text-[13px] h-8 flex-1"
-                  autoFocus
-                  onKeyDown={(e) => e.key === "Enter" && saveTracking()}
-                />
-                <Button size="sm" onClick={saveTracking} className="h-8 px-2 bg-[#007AFF] hover:bg-[#0066DD]">
-                  <Save className="h-3.5 w-3.5" />
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setEditingTracking(false)} className="h-8 px-2">
-                  Annuler
-                </Button>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={trackingInput}
+                    onChange={(e) => setTrackingInput(e.target.value)}
+                    placeholder="Numero de suivi La Poste..."
+                    className="text-[13px] h-9 flex-1 font-mono"
+                    autoFocus
+                    onKeyDown={(e) => e.key === "Enter" && saveTracking()}
+                  />
+                  <Button size="sm" onClick={saveTracking} disabled={!trackingInput.trim()} className="h-9 px-3 bg-[#007AFF] hover:bg-[#0066DD]">
+                    <Save className="h-3.5 w-3.5 mr-1.5" />
+                    OK
+                  </Button>
+                </div>
+                {renvoi.trackingNumber && (
+                  <button
+                    onClick={() => setEditingTracking(false)}
+                    className="text-[11px] text-muted-foreground hover:text-foreground"
+                  >
+                    Annuler
+                  </button>
+                )}
               </div>
             ) : (
               <div className="flex items-center justify-between">
-                <p className={cn("text-[13px]", renvoi.trackingNumber ? "font-mono" : "text-muted-foreground italic")}>
-                  {renvoi.trackingNumber || "Pas encore de numero de suivi"}
-                </p>
-                {renvoi.trackingNumber && (
-                  <a
-                    href={`https://www.laposte.fr/outils/suivre-vos-envois?code=${renvoi.trackingNumber}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                )}
+                <p className="text-[13px] font-mono">{renvoi.trackingNumber}</p>
+                <a
+                  href={`https://www.laposte.fr/outils/suivre-vos-envois?code=${renvoi.trackingNumber}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
               </div>
             )}
 
@@ -247,7 +220,7 @@ export function RenvoiDetailSheet({
                         {tracking.lastEventLabel}
                         {tracking.lastEventDate && (
                           <span className="ml-1.5 text-[11px] opacity-70">
-                            — {new Date(tracking.lastEventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                            \u2014 {new Date(tracking.lastEventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                           </span>
                         )}
                       </p>
@@ -276,32 +249,6 @@ export function RenvoiDetailSheet({
             )}
           </div>
 
-          {/* ─── Colis revenu ─── */}
-          <button
-            onClick={() => onColisRevenuToggle(renvoi.id, !renvoi.colisRevenu)}
-            className={cn(
-              "w-full flex items-center gap-3 rounded-lg border p-3 transition-colors",
-              renvoi.colisRevenu
-                ? "border-emerald-500/30 bg-emerald-500/5"
-                : "border-border hover:border-muted-foreground/30 hover:bg-secondary/50"
-            )}
-          >
-            <div className={cn(
-              "w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors shrink-0",
-              renvoi.colisRevenu
-                ? "border-emerald-500 bg-emerald-500"
-                : "border-muted-foreground/30"
-            )}>
-              {renvoi.colisRevenu && <Check className="h-3 w-3 text-white" />}
-            </div>
-            <div className="flex items-center gap-2">
-              <PackageCheck className={cn("h-4 w-4", renvoi.colisRevenu ? "text-emerald-600" : "text-muted-foreground")} />
-              <span className={cn("text-[13px] font-medium", renvoi.colisRevenu ? "text-emerald-600" : "text-muted-foreground")}>
-                {renvoi.colisRevenu ? "Colis original revenu" : "Colis original pas encore revenu"}
-              </span>
-            </div>
-          </button>
-
           {/* ─── Note (auto-save) ─── */}
           <div>
             <label className="text-[12px] font-medium text-muted-foreground mb-1.5 block">Note</label>
@@ -309,7 +256,6 @@ export function RenvoiDetailSheet({
               value={noteInput}
               onChange={(e) => handleNoteChange(e.target.value)}
               onBlur={() => {
-                // Force save on blur
                 if (debounceRef.current) clearTimeout(debounceRef.current)
                 if (noteInput !== renvoi.note) {
                   onNoteChange(renvoi.id, noteInput)

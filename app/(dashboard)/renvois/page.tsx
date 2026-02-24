@@ -11,10 +11,9 @@ import {
   updateRenvoiStatus,
   updateRenvoiTracking,
   updateRenvoiNote,
-  updateRenvoiColisRevenu,
   deleteRenvoi,
+  deriveRenvoiStatusFromTracking,
   REASON_OPTIONS,
-  getStatusOption,
 } from "@/lib/renvois"
 import type { Renvoi, RenvoiStatus, LaPosteTracking } from "@/lib/types"
 import { toast } from "sonner"
@@ -41,6 +40,48 @@ export default function RenvoisPage() {
   const [trackingMap, setTrackingMap] = useState<Record<string, LaPosteTracking>>({})
   const [trackingLoading, setTrackingLoading] = useState(false)
 
+  // ─── Auto-status: update renvoi status based on La Poste ───
+
+  const autoUpdateStatuses = useCallback(async (
+    renvoiList: Renvoi[],
+    tracking: Record<string, LaPosteTracking>
+  ) => {
+    const updates: { id: string; newStatus: RenvoiStatus }[] = []
+
+    for (const r of renvoiList) {
+      if (!r.trackingNumber) continue
+      const lp = tracking[r.trackingNumber]
+      if (!lp) continue
+
+      const newStatus = deriveRenvoiStatusFromTracking(r.status, lp.statusSummary)
+      if (newStatus) {
+        updates.push({ id: r.id, newStatus })
+      }
+    }
+
+    if (updates.length === 0) return
+
+    // Optimistic UI update
+    setRenvois((prev) =>
+      prev.map((r) => {
+        const upd = updates.find((u) => u.id === r.id)
+        return upd ? { ...r, status: upd.newStatus } : r
+      })
+    )
+
+    // Also update selected renvoi if needed
+    setSelectedRenvoi((prev) => {
+      if (!prev) return prev
+      const upd = updates.find((u) => u.id === prev.id)
+      return upd ? { ...prev, status: upd.newStatus } : prev
+    })
+
+    // Persist to Supabase
+    for (const { id, newStatus } of updates) {
+      await updateRenvoiStatus(supabase, id, newStatus)
+    }
+  }, [supabase])
+
   // ─── Load data ───────────────────────────────────────
 
   const loadRenvois = useCallback(async () => {
@@ -55,7 +96,7 @@ export default function RenvoisPage() {
       .filter((n) => n && n.length > 3)
       .filter((n, i, arr) => arr.indexOf(n) === i)
 
-    if (numbers.length === 0) return
+    if (numbers.length === 0) return {}
 
     setTrackingLoading(true)
     try {
@@ -71,23 +112,31 @@ export default function RenvoisPage() {
           map[t.trackingNumber] = t
         }
         setTrackingMap(map)
+        return map
       }
     } catch {
       // silent
     } finally {
       setTrackingLoading(false)
     }
+    return {}
   }, [])
 
   useEffect(() => {
     loadRenvois()
-      .then((data) => {
-        if (data?.length) fetchAllTracking(data)
+      .then(async (data) => {
+        if (data?.length) {
+          const map = await fetchAllTracking(data)
+          // Auto-update statuses based on La Poste
+          if (map && Object.keys(map).length > 0) {
+            await autoUpdateStatuses(data, map)
+          }
+        }
       })
       .finally(() => setLoading(false))
-  }, [loadRenvois, fetchAllTracking])
+  }, [loadRenvois, fetchAllTracking, autoUpdateStatuses])
 
-  // ─── Filtering (search + reason, no status filter — columns are the filter) ─
+  // ─── Filtering ─────────────────────────────────────────
 
   const filteredRenvois = useMemo(() => {
     return renvois.filter((r) => {
@@ -107,28 +156,32 @@ export default function RenvoisPage() {
 
   // ─── Actions ─────────────────────────────────────────
 
-  async function handleStatusChange(id: string, newStatus: RenvoiStatus) {
-    // Optimistic update
-    setRenvois((prev) => prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r)))
-    // Also update the selected renvoi if it's the one being changed
-    setSelectedRenvoi((prev) => prev && prev.id === id ? { ...prev, status: newStatus } : prev)
-    await updateRenvoiStatus(supabase, id, newStatus)
-    toast.success(`Statut : ${getStatusOption(newStatus).label}`)
-  }
-
   async function handleTrackingChange(id: string, tracking: string) {
     setRenvois((prev) => prev.map((r) => (r.id === id ? { ...r, trackingNumber: tracking } : r)))
     setSelectedRenvoi((prev) => prev && prev.id === id ? { ...prev, trackingNumber: tracking } : prev)
     await updateRenvoiTracking(supabase, id, tracking)
     toast.success("Numero de suivi enregistre")
-    // Fetch La Poste tracking
+
+    // Fetch La Poste tracking and auto-update status
     if (tracking && tracking.length > 3) {
       try {
         const res = await fetch(`/api/tracking?numbers=${encodeURIComponent(tracking)}`)
         if (res.ok) {
           const json = await res.json()
           if (json.tracking?.[0]) {
-            setTrackingMap((prev) => ({ ...prev, [tracking]: json.tracking[0] }))
+            const lp: LaPosteTracking = json.tracking[0]
+            setTrackingMap((prev) => ({ ...prev, [tracking]: lp }))
+
+            // Auto-update this renvoi's status
+            const renvoi = renvois.find((r) => r.id === id)
+            if (renvoi) {
+              const newStatus = deriveRenvoiStatusFromTracking(renvoi.status, lp.statusSummary)
+              if (newStatus) {
+                setRenvois((prev) => prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r)))
+                setSelectedRenvoi((prev) => prev && prev.id === id ? { ...prev, status: newStatus } : prev)
+                await updateRenvoiStatus(supabase, id, newStatus)
+              }
+            }
           }
         }
       } catch { /* silent */ }
@@ -139,13 +192,6 @@ export default function RenvoisPage() {
     setRenvois((prev) => prev.map((r) => (r.id === id ? { ...r, note } : r)))
     setSelectedRenvoi((prev) => prev && prev.id === id ? { ...prev, note } : prev)
     await updateRenvoiNote(supabase, id, note)
-  }
-
-  async function handleColisRevenuToggle(id: string, value: boolean) {
-    setRenvois((prev) => prev.map((r) => (r.id === id ? { ...r, colisRevenu: value } : r)))
-    setSelectedRenvoi((prev) => prev && prev.id === id ? { ...prev, colisRevenu: value } : prev)
-    await updateRenvoiColisRevenu(supabase, id, value)
-    toast.success(value ? "Colis marque comme revenu" : "Colis marque comme non revenu")
   }
 
   async function handleDelete(id: string) {
@@ -167,8 +213,8 @@ export default function RenvoisPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
         </div>
-        <div className="flex gap-4">
-          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="flex-1 h-96 rounded-xl" />)}
+        <div className="grid grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-96 rounded-xl" />)}
         </div>
       </div>
     )
@@ -220,7 +266,7 @@ export default function RenvoisPage() {
         trackingMap={trackingMap}
         onCardClick={(renvoi) => {
           setSelectedRenvoi(renvoi)
-          // Fetch fresh tracking for this card
+          // Fetch fresh tracking
           if (renvoi.trackingNumber && renvoi.trackingNumber.length > 3) {
             fetch(`/api/tracking?numbers=${encodeURIComponent(renvoi.trackingNumber)}`)
               .then((res) => res.ok ? res.json() : null)
@@ -232,7 +278,6 @@ export default function RenvoisPage() {
               .catch(() => {})
           }
         }}
-        onStatusChange={handleStatusChange}
       />
 
       {/* Detail Sheet */}
@@ -242,10 +287,8 @@ export default function RenvoisPage() {
         onOpenChange={(open) => { if (!open) setSelectedRenvoi(null) }}
         tracking={selectedRenvoi?.trackingNumber ? trackingMap[selectedRenvoi.trackingNumber] : undefined}
         trackingLoading={trackingLoading && !!selectedRenvoi?.trackingNumber}
-        onStatusChange={handleStatusChange}
         onTrackingChange={handleTrackingChange}
         onNoteChange={handleNoteChange}
-        onColisRevenuToggle={handleColisRevenuToggle}
         onDelete={handleDelete}
       />
 
@@ -255,9 +298,14 @@ export default function RenvoisPage() {
         onOpenChange={setShowCreate}
         onCreated={async () => {
           const data = await loadRenvois()
-          if (data?.length) fetchAllTracking(data)
+          if (data?.length) {
+            const map = await fetchAllTracking(data)
+            if (map && Object.keys(map).length > 0) {
+              await autoUpdateStatuses(data, map)
+            }
+          }
           setShowCreate(false)
-          toast.success("Renvoi cree avec succes")
+          toast.success("Renvoi ajoute")
         }}
         supabase={supabase}
       />

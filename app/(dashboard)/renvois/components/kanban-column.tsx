@@ -1,27 +1,20 @@
 "use client"
 
-import React from "react"
 import { cn } from "@/lib/utils"
 import { KanbanCard } from "./kanban-card"
-import type { Renvoi, LaPosteTracking, RenvoiStatus } from "@/lib/types"
+import type { Renvoi, LaPosteTracking } from "@/lib/types"
 
 interface KanbanColumnProps {
-  status: RenvoiStatus
   label: string
   icon: React.ElementType
-  color: string // tailwind text color class e.g. "text-amber-600"
-  bgColor: string // tailwind bg class e.g. "bg-amber-500/10"
+  color: string
+  bgColor: string
   renvois: Renvoi[]
   trackingMap: Record<string, LaPosteTracking>
   onCardClick: (renvoi: Renvoi) => void
-  onDrop: (renvoiId: string, newStatus: RenvoiStatus) => void
-  draggedId: string | null
-  onDragStart: (id: string) => void
-  onDragEnd: () => void
 }
 
 export function KanbanColumn({
-  status,
   label,
   icon: Icon,
   color,
@@ -29,32 +22,9 @@ export function KanbanColumn({
   renvois,
   trackingMap,
   onCardClick,
-  onDrop,
-  draggedId,
-  onDragStart,
-  onDragEnd,
 }: KanbanColumnProps) {
-  const [dragOver, setDragOver] = React.useState(false)
-
   return (
-    <div
-      className={cn(
-        "flex flex-col rounded-xl border border-border bg-secondary/30 min-w-[85vw] sm:min-w-0 sm:flex-1 snap-center",
-        dragOver && "bg-blue-500/5 border-blue-300"
-      )}
-      onDragOver={(e) => {
-        e.preventDefault()
-        e.dataTransfer.dropEffect = "move"
-        setDragOver(true)
-      }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => {
-        e.preventDefault()
-        setDragOver(false)
-        const id = e.dataTransfer.getData("text/plain")
-        if (id) onDrop(id, status)
-      }}
-    >
+    <div className="flex flex-col rounded-xl border border-border bg-secondary/30">
       {/* Column header */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border">
         <div className={cn("w-6 h-6 rounded-md flex items-center justify-center", bgColor)}>
@@ -69,7 +39,7 @@ export function KanbanColumn({
       </div>
 
       {/* Cards */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-2 max-h-[calc(100vh-300px)]">
+      <div className="flex-1 overflow-y-auto p-2 space-y-2 max-h-[calc(100vh-340px)]">
         {renvois.length === 0 && (
           <div className="flex flex-col items-center justify-center py-10 text-muted-foreground/40">
             <Icon className="h-6 w-6 mb-2" />
@@ -82,9 +52,6 @@ export function KanbanColumn({
             renvoi={r}
             tracking={r.trackingNumber ? trackingMap[r.trackingNumber] : undefined}
             onClick={() => onCardClick(r)}
-            onDragStart={onDragStart}
-            onDragEnd={onDragEnd}
-            isDragging={draggedId === r.id}
           />
         ))}
       </div>

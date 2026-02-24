@@ -119,7 +119,7 @@ export interface Segment {
 // === Renvois ===
 
 export type RenvoiReason = "colis_perdu" | "colis_endommage" | "erreur_preparation" | "retour_client" | "autre"
-export type RenvoiStatus = "en_cours" | "expedie" | "livre" | "annule"
+export type RenvoiStatus = "a_renvoyer" | "expedie" | "livre"
 
 export interface Renvoi {
   id: string

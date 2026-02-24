@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Search, Package } from "lucide-react"
+import { Search, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -29,14 +29,14 @@ interface SearchOrderResult {
 }
 
 function formatDate(dateStr: string): string {
-  if (!dateStr) return "—"
+  if (!dateStr) return "\u2014"
   const d = new Date(dateStr)
   return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })
 }
 
 function formatCurrency(amount: string): string {
   const n = parseFloat(amount)
-  if (isNaN(n)) return "0,00 €"
+  if (isNaN(n)) return "0,00 \u20AC"
   return n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })
 }
 
@@ -57,7 +57,6 @@ export function CreateRenvoiDialog({
   const [searching, setSearching] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<SearchOrderResult | null>(null)
   const [reason, setReason] = useState<RenvoiReason>("colis_perdu")
-  const [trackingNumber, setTrackingNumber] = useState("")
   const [note, setNote] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -69,7 +68,6 @@ export function CreateRenvoiDialog({
       setSearchResults([])
       setSelectedOrder(null)
       setReason("colis_perdu")
-      setTrackingNumber("")
       setNote("")
     }
   }, [open])
@@ -87,7 +85,7 @@ export function CreateRenvoiDialog({
           setSearchResults(data.orders ?? [])
         }
       } catch { /* silent */ } finally { setSearching(false) }
-    }, 500)
+    }, 400)
 
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [searchQuery])
@@ -103,7 +101,6 @@ export function CreateRenvoiDialog({
         customerName: selectedOrder.customerName,
         customerEmail: selectedOrder.customerEmail,
         reason,
-        trackingNumber,
         note,
       })
       onCreated()
@@ -114,7 +111,7 @@ export function CreateRenvoiDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{step === 1 ? "Rechercher une commande" : "Details du renvoi"}</DialogTitle>
+          <DialogTitle>{step === 1 ? "Quelle commande renvoyer ?" : "Raison du renvoi"}</DialogTitle>
         </DialogHeader>
 
         {step === 1 && (
@@ -122,7 +119,7 @@ export function CreateRenvoiDialog({
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="N commande, nom ou email..."
+                placeholder="Rechercher par n de commande, nom ou email..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 text-[13px]"
@@ -130,9 +127,14 @@ export function CreateRenvoiDialog({
               />
             </div>
             <div className="max-h-[300px] overflow-y-auto space-y-1">
-              {searching && <div className="text-center py-6 text-[13px] text-muted-foreground">Recherche en cours...</div>}
+              {searching && <div className="text-center py-6 text-[13px] text-muted-foreground">Recherche...</div>}
               {!searching && searchQuery.length >= 2 && searchResults.length === 0 && (
-                <div className="text-center py-6 text-[13px] text-muted-foreground">Aucune commande trouvee.</div>
+                <div className="text-center py-6 text-[13px] text-muted-foreground">Aucune commande trouvee</div>
+              )}
+              {!searching && searchQuery.length < 2 && (
+                <div className="text-center py-8 text-[13px] text-muted-foreground/60">
+                  Tape un nom, email ou numero de commande
+                </div>
               )}
               {searchResults.map((order) => (
                 <button
@@ -159,13 +161,12 @@ export function CreateRenvoiDialog({
 
         {step === 2 && selectedOrder && (
           <div className="space-y-4">
+            {/* Selected order recap */}
             <div className="rounded-lg border border-border bg-secondary/50 p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-[13px] font-medium">{selectedOrder.name}</p>
-                  <p className="text-[12px] text-muted-foreground">
-                    {selectedOrder.customerName} — {selectedOrder.customerEmail}
-                  </p>
+                  <p className="text-[12px] text-muted-foreground">{selectedOrder.customerName}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-[13px] font-medium">{formatCurrency(selectedOrder.totalPrice)}</p>
@@ -174,32 +175,43 @@ export function CreateRenvoiDialog({
               </div>
             </div>
 
+            {/* Reason */}
             <div>
-              <label className="text-[12px] font-medium text-muted-foreground mb-1.5 block">Raison du renvoi</label>
-              <select
-                value={reason}
-                onChange={(e) => setReason(e.target.value as RenvoiReason)}
-                className="w-full h-9 px-3 rounded-md border border-border bg-card text-[13px] text-foreground"
-              >
-                {REASON_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.emoji} {r.label}</option>)}
-              </select>
+              <label className="text-[12px] font-medium text-muted-foreground mb-2 block">Pourquoi tu renvoies ?</label>
+              <div className="grid grid-cols-2 gap-2">
+                {REASON_OPTIONS.map((r) => (
+                  <button
+                    key={r.value}
+                    onClick={() => setReason(r.value)}
+                    className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border text-[13px] text-left transition-colors ${
+                      reason === r.value
+                        ? "border-[#007AFF] bg-[#007AFF]/5 font-medium"
+                        : "border-border hover:bg-secondary"
+                    }`}
+                  >
+                    <span>{r.emoji}</span>
+                    <span>{r.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div>
-              <label className="text-[12px] font-medium text-muted-foreground mb-1.5 block">Numero de suivi du renvoi (optionnel)</label>
-              <Input placeholder="Ex: 6A12345678901" value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} className="text-[13px]" />
-            </div>
-
+            {/* Note (optional) */}
             <div>
               <label className="text-[12px] font-medium text-muted-foreground mb-1.5 block">Note (optionnel)</label>
-              <Textarea placeholder="Contexte, details..." value={note} onChange={(e) => setNote(e.target.value)} className="text-[13px] min-h-[60px]" />
+              <Textarea
+                placeholder="Contexte, details..."
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                className="text-[13px] min-h-[60px]"
+              />
             </div>
 
             <DialogFooter>
               <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Annuler</Button>
               <Button size="sm" onClick={handleSubmit} disabled={submitting} className="gap-1.5 bg-[#007AFF] hover:bg-[#0066DD]">
-                <Package className="h-3.5 w-3.5" />
-                {submitting ? "Creation..." : "Creer le renvoi"}
+                <Plus className="h-3.5 w-3.5" />
+                {submitting ? "Creation..." : "Ajouter a renvoyer"}
               </Button>
             </DialogFooter>
           </div>

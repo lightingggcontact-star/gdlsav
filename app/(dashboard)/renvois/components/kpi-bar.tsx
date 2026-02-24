@@ -1,6 +1,6 @@
 "use client"
 
-import { Clock, Truck, PackageCheck, Euro } from "lucide-react"
+import { Clock, Truck, CircleCheck, Euro } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Renvoi } from "@/lib/types"
 
@@ -34,9 +34,9 @@ function KpiCard({
 }
 
 export function KpiBar({ renvois }: { renvois: Renvoi[] }) {
-  const enCours = renvois.filter((r) => r.status === "en_cours").length
+  const aRenvoyer = renvois.filter((r) => r.status === "a_renvoyer").length
   const expedies = renvois.filter((r) => r.status === "expedie").length
-  const colisRevenus = renvois.filter((r) => r.colisRevenu).length
+  const livres = renvois.filter((r) => r.status === "livre").length
 
   const now = new Date()
   const thisMonth = renvois.filter((r) => {
@@ -51,9 +51,8 @@ export function KpiBar({ renvois }: { renvois: Renvoi[] }) {
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       <KpiCard
         icon={Clock}
-        label="A traiter"
-        value={enCours}
-        subtitle={enCours > 0 ? `sur ${renvois.length} total` : undefined}
+        label="A renvoyer"
+        value={aRenvoyer}
         iconBg="bg-amber-500/10"
         iconColor="text-amber-600"
       />
@@ -65,10 +64,9 @@ export function KpiBar({ renvois }: { renvois: Renvoi[] }) {
         iconColor="text-blue-600"
       />
       <KpiCard
-        icon={PackageCheck}
-        label="Colis revenus"
-        value={colisRevenus}
-        subtitle={renvois.length > 0 ? `${Math.round((colisRevenus / renvois.length) * 100)}% du total` : undefined}
+        icon={CircleCheck}
+        label="Livres"
+        value={livres}
         iconBg="bg-emerald-500/10"
         iconColor="text-emerald-600"
       />

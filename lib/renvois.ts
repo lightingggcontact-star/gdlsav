@@ -1,5 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import type { Renvoi, RenvoiReason, RenvoiStatus } from "./types"
+import type { Renvoi, RenvoiReason, RenvoiStatus, ShippingStatus } from "./types"
+
+// Map old statuses from DB to new ones
+function normalizeStatus(raw: string): RenvoiStatus {
+  if (raw === "a_renvoyer") return "a_renvoyer"
+  if (raw === "expedie") return "expedie"
+  if (raw === "livre") return "livre"
+  // Legacy mappings
+  if (raw === "en_cours") return "a_renvoyer"
+  if (raw === "annule") return "a_renvoyer"
+  return "a_renvoyer"
+}
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function mapRow(row: any): Renvoi {
@@ -12,7 +23,7 @@ function mapRow(row: any): Renvoi {
     customerName: row.customer_name,
     customerEmail: row.customer_email ?? "",
     reason: row.reason as RenvoiReason,
-    status: row.status as RenvoiStatus,
+    status: normalizeStatus(row.status),
     trackingNumber: row.tracking_number ?? "",
     note: row.note ?? "",
     renvoiDate: row.renvoi_date,
@@ -40,9 +51,7 @@ export async function createRenvoi(
     customerName: string
     customerEmail: string
     reason: RenvoiReason
-    trackingNumber?: string
     note?: string
-    renvoiDate?: string
   }
 ): Promise<Renvoi> {
   const { data, error } = await supabase
@@ -54,14 +63,15 @@ export async function createRenvoi(
       customer_name: input.customerName,
       customer_email: input.customerEmail,
       reason: input.reason,
-      tracking_number: input.trackingNumber ?? "",
+      status: "a_renvoyer",
+      tracking_number: "",
       note: input.note ?? "",
-      renvoi_date: input.renvoiDate ?? new Date().toISOString().split("T")[0],
+      renvoi_date: new Date().toISOString().split("T")[0],
     })
     .select()
     .single()
 
-  if (error || !data) throw new Error("Impossible de créer le renvoi")
+  if (error || !data) throw new Error("Impossible de creer le renvoi")
   return mapRow(data)
 }
 
@@ -89,31 +99,46 @@ export async function updateRenvoiNote(
   await supabase.from("renvois").update({ note }).eq("id", id)
 }
 
-export async function updateRenvoiColisRevenu(
-  supabase: SupabaseClient,
-  id: string,
-  colisRevenu: boolean
-) {
-  await supabase.from("renvois").update({ colis_revenu: colisRevenu }).eq("id", id)
-}
-
 export async function deleteRenvoi(supabase: SupabaseClient, id: string) {
   await supabase.from("renvois").delete().eq("id", id)
 }
 
+/**
+ * Derive the correct renvoi status from La Poste tracking.
+ * Returns null if no status change is needed.
+ */
+export function deriveRenvoiStatusFromTracking(
+  currentStatus: RenvoiStatus,
+  lpStatus: ShippingStatus | "unknown"
+): RenvoiStatus | null {
+  // Already livre → no change
+  if (currentStatus === "livre") return null
+
+  // La Poste says delivered or pickup ready → livre
+  if (lpStatus === "delivered" || lpStatus === "pickup_ready") {
+    return "livre"
+  }
+
+  // La Poste says in transit / out for delivery → expedie
+  if (lpStatus === "in_transit" || lpStatus === "out_for_delivery" || lpStatus === "delayed") {
+    return currentStatus === "a_renvoyer" ? "expedie" : null
+  }
+
+  return null
+}
+
 export const REASON_OPTIONS: { value: RenvoiReason; label: string; emoji: string }[] = [
   { value: "colis_perdu", label: "Colis perdu", emoji: "📦" },
-  { value: "colis_endommage", label: "Colis endommagé", emoji: "💔" },
-  { value: "erreur_preparation", label: "Erreur préparation", emoji: "⚠️" },
+  { value: "colis_endommage", label: "Colis endommage", emoji: "💔" },
+  { value: "erreur_preparation", label: "Erreur preparation", emoji: "⚠️" },
   { value: "retour_client", label: "Retour client", emoji: "↩️" },
   { value: "autre", label: "Autre", emoji: "📋" },
 ]
 
 export const STATUS_OPTIONS: { value: RenvoiStatus; label: string; bg: string; text: string }[] = [
-  { value: "en_cours", label: "En cours", bg: "bg-amber-500/15", text: "text-amber-600" },
-  { value: "expedie", label: "Expédié", bg: "bg-blue-500/15", text: "text-blue-600" },
-  { value: "livre", label: "Livré", bg: "bg-emerald-500/15", text: "text-emerald-600" },
-  { value: "annule", label: "Annulé", bg: "bg-red-500/15", text: "text-red-600" },
+  { value: "a_renvoyer", label: "A renvoyer", bg: "bg-amber-500/15", text: "text-amber-600" },
+  { value: "expedie", label: "Expedie", bg: "bg-blue-500/15", text: "text-blue-600" },
+  { value: "livre", label: "Livre", bg: "bg-emerald-500/15", text: "text-emerald-600" },
 ]
 
 export function getReasonLabel(reason: RenvoiReason): string {

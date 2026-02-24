@@ -1,7 +1,6 @@
 "use client"
 
-import { useState } from "react"
-import { Clock, Truck, CircleCheck, XCircle } from "lucide-react"
+import { Clock, Truck, CircleCheck } from "lucide-react"
 import { KanbanColumn } from "./kanban-column"
 import type { Renvoi, LaPosteTracking, RenvoiStatus } from "@/lib/types"
 
@@ -12,58 +11,46 @@ const COLUMNS: {
   color: string
   bgColor: string
 }[] = [
-  { status: "en_cours", label: "A traiter", icon: Clock, color: "text-amber-600", bgColor: "bg-amber-500/10" },
+  { status: "a_renvoyer", label: "A renvoyer", icon: Clock, color: "text-amber-600", bgColor: "bg-amber-500/10" },
   { status: "expedie", label: "Expedie", icon: Truck, color: "text-blue-600", bgColor: "bg-blue-500/10" },
   { status: "livre", label: "Livre", icon: CircleCheck, color: "text-emerald-600", bgColor: "bg-emerald-500/10" },
-  { status: "annule", label: "Annule", icon: XCircle, color: "text-red-600", bgColor: "bg-red-500/10" },
 ]
 
 interface KanbanBoardProps {
   renvois: Renvoi[]
   trackingMap: Record<string, LaPosteTracking>
   onCardClick: (renvoi: Renvoi) => void
-  onStatusChange: (id: string, newStatus: RenvoiStatus) => void
 }
 
 function sortRenvois(renvois: Renvoi[], status: RenvoiStatus): Renvoi[] {
   return [...renvois].sort((a, b) => {
     const da = new Date(a.renvoiDate).getTime()
     const db = new Date(b.renvoiDate).getTime()
-    // "A traiter": oldest first (most urgent on top)
-    if (status === "en_cours") return da - db
+    // "A renvoyer": oldest first (most urgent)
+    if (status === "a_renvoyer") return da - db
     // Others: newest first
     return db - da
   })
 }
 
-export function KanbanBoard({ renvois, trackingMap, onCardClick, onStatusChange }: KanbanBoardProps) {
-  const [draggedId, setDraggedId] = useState<string | null>(null)
-
+export function KanbanBoard({ renvois, trackingMap, onCardClick }: KanbanBoardProps) {
   // Group renvois by status
   const grouped: Record<RenvoiStatus, Renvoi[]> = {
-    en_cours: [],
+    a_renvoyer: [],
     expedie: [],
     livre: [],
-    annule: [],
   }
   for (const r of renvois) {
-    grouped[r.status]?.push(r)
-  }
-
-  function handleDrop(renvoiId: string, newStatus: RenvoiStatus) {
-    setDraggedId(null)
-    const renvoi = renvois.find((r) => r.id === renvoiId)
-    if (renvoi && renvoi.status !== newStatus) {
-      onStatusChange(renvoiId, newStatus)
+    if (grouped[r.status]) {
+      grouped[r.status].push(r)
     }
   }
 
   return (
-    <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 sm:snap-none sm:overflow-x-visible">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       {COLUMNS.map((col) => (
         <KanbanColumn
           key={col.status}
-          status={col.status}
           label={col.label}
           icon={col.icon}
           color={col.color}
@@ -71,10 +58,6 @@ export function KanbanBoard({ renvois, trackingMap, onCardClick, onStatusChange 
           renvois={sortRenvois(grouped[col.status], col.status)}
           trackingMap={trackingMap}
           onCardClick={onCardClick}
-          onDrop={handleDrop}
-          draggedId={draggedId}
-          onDragStart={setDraggedId}
-          onDragEnd={() => setDraggedId(null)}
         />
       ))}
     </div>
