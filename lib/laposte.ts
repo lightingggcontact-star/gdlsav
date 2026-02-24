@@ -8,9 +8,9 @@ const PROBLEM_CODES = new Set(["PB1", "ND1", "DO3", "DI3"])
 // Event codes that indicate returned to sender
 const RETURN_CODES = new Set(["RE1", "DI2"])
 // Event codes that indicate delivered
-const DELIVERED_CODES = new Set(["DI0", "DI1"])
+const DELIVERED_CODES = new Set(["DI0", "DI1", "LI0", "LI1"])
 // Event codes that indicate available at pickup point
-const PICKUP_CODES = new Set(["AG1", "RE0"])
+const PICKUP_CODES = new Set(["AG1", "AG0", "AG2", "RE0", "RE2"])
 // Event codes that indicate out for delivery
 const OUT_FOR_DELIVERY_CODES = new Set(["DR1", "MD2"])
 
@@ -29,6 +29,12 @@ function deriveStatusSummary(
 
   // Also check if isFinal and deliveryDate exists
   if (shipment.isFinal && shipment.deliveryDate) return "delivered"
+
+  // Fallback: check label text for known patterns (catches codes we don't have)
+  const label = shipment.event[0]?.label?.toLowerCase() ?? ""
+  if (label.includes("livr") || label.includes("distribu")) return "delivered"
+  if (label.includes("disposition") || label.includes("point relais") || label.includes("point de retrait")) return "delivered"
+  if (label.includes("retour")) return "returned"
 
   // Check all events for problems/returns (not just the latest)
   for (const evt of shipment.event) {
