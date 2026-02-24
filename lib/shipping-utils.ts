@@ -142,6 +142,9 @@ export function deriveShippingStatus(
     return "in_transit"
   }
 
+  // Pickup point = delivered (colis dispo en point relais = livré)
+  if (laPosteStatus === "pickup_ready") return "delivered"
+
   // La Poste says in_transit but past threshold → delayed
   if (laPosteStatus === "in_transit") {
     const threshold = countryCode === "BE" ? thresholds.be : thresholds.fr
