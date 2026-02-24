@@ -132,6 +132,52 @@ function ActionButton({
   return btn
 }
 
+const BOLD_KEYWORDS = [
+  "livré", "distribué", "destinataire", "point relais", "point de retrait",
+  "mis à disposition", "mise à disposition", "boîte aux lettres", "avis de passage",
+  "retourné", "retour", "incomplet", "incomplete", "incomplète", "refusé",
+  "problème", "anomalie", "erreur", "perdu", "égaré",
+  "en cours d'acheminement", "pris en charge", "dédouanement",
+]
+
+function highlightEvent(text: string): React.ReactNode {
+  if (!text) return null
+  const lower = text.toLowerCase()
+  const parts: { start: number; end: number }[] = []
+
+  for (const kw of BOLD_KEYWORDS) {
+    let idx = lower.indexOf(kw)
+    while (idx !== -1) {
+      parts.push({ start: idx, end: idx + kw.length })
+      idx = lower.indexOf(kw, idx + 1)
+    }
+  }
+
+  if (parts.length === 0) return text
+
+  // Merge overlapping
+  parts.sort((a, b) => a.start - b.start)
+  const merged: { start: number; end: number }[] = [parts[0]]
+  for (let i = 1; i < parts.length; i++) {
+    const last = merged[merged.length - 1]
+    if (parts[i].start <= last.end) {
+      last.end = Math.max(last.end, parts[i].end)
+    } else {
+      merged.push(parts[i])
+    }
+  }
+
+  const result: React.ReactNode[] = []
+  let cursor = 0
+  for (const { start, end } of merged) {
+    if (cursor < start) result.push(text.slice(cursor, start))
+    result.push(<strong key={start} className="font-semibold text-foreground">{text.slice(start, end)}</strong>)
+    cursor = end
+  }
+  if (cursor < text.length) result.push(text.slice(cursor))
+  return result
+}
+
 export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds, onSelectionChange, segments, orderNotes = {}, thresholds }: ShippingTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("alertLevel")
   const [sortDir, setSortDir] = useState<SortDirection>("asc")
@@ -270,7 +316,7 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
   return (
     <div className="space-y-3">
       <div className={cn("rounded-lg border border-border overflow-hidden bg-card shadow-[0_1px_0_0_rgba(0,0,0,.05)]", isDragging && "select-none")}>
-        <Table>
+        <Table className="table-fixed">
           <TableHeader>
             <TableRow className="hover:bg-transparent border-b border-border">
               <TableHead className="w-10">
@@ -280,12 +326,12 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
                   aria-label="Tout sélectionner"
                 />
               </TableHead>
-              <SortHeader label="Commande" sortKeyName="orderName" />
-              <SortHeader label="Client" sortKeyName="customerName" />
-              <SortHeader label="Expédié" sortKeyName="shippedAt" />
-              <SortHeader label="Durée" sortKeyName="businessDaysElapsed" />
+              <SortHeader label="Commande" sortKeyName="orderName" className="w-[12%]" />
+              <SortHeader label="Client" sortKeyName="customerName" className="w-[20%]" />
+              <SortHeader label="Expédié" sortKeyName="shippedAt" className="w-[10%]" />
+              <SortHeader label="Durée" sortKeyName="businessDaysElapsed" className="w-[10%]" />
               <SortHeader label="Statut" sortKeyName="alertLevel" />
-              <TableHead className="text-right w-28">Actions</TableHead>
+              <TableHead className="w-20" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -392,23 +438,28 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
                     <DurationBar days={order.businessDaysElapsed} effectiveStatus={effectiveStatus} threshold={threshold} />
                   </TableCell>
 
-                  {/* Statut + La Poste last event */}
-                  <TableCell className="min-w-50">
-                    <div className="flex items-start gap-2">
-                      <Badge variant="outline" className={cn("text-[10px] font-medium shrink-0 mt-0.5", statusConfig.badgeClassName)}>
+                  {/* Statut + La Poste detail */}
+                  <TableCell>
+                    <div className="space-y-1">
+                      <Badge variant="outline" className={cn("text-[10px] font-medium", statusConfig.badgeClassName)}>
                         {statusConfig.label}
                       </Badge>
                       {tracking?.lastEventLabel && (
-                        <span className="text-[11px] text-muted-foreground leading-tight">
-                          {tracking.lastEventLabel}
-                        </span>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          {highlightEvent(tracking.lastEventLabel)}
+                          {tracking.lastEventDate && (
+                            <span className="text-[10px] text-muted-foreground/50 ml-1">
+                              — {new Date(tracking.lastEventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                            </span>
+                          )}
+                        </p>
                       )}
                     </div>
                   </TableCell>
 
-                  {/* Action buttons */}
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {/* Action icons — always visible */}
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-0.5">
                       <ActionButton
                         icon={Store}
                         tooltip="Ouvrir dans Shopify"
