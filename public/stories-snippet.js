@@ -41,17 +41,17 @@
     '.gdl-player-overlay{position:fixed;bottom:20px;right:20px;z-index:99999;width:350px;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.3);background:#000;aspect-ratio:9/16}',
     '@media(max-width:768px){.gdl-player-overlay{position:fixed;inset:0;width:100%;height:100%;border-radius:0;bottom:auto;right:auto}}',
     '.gdl-player-video{width:100%;height:100%;object-fit:cover}',
-    '.gdl-player-close{position:absolute;top:12px;right:12px;background:rgba(0,0,0,.5);border:none;color:#fff;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center}',
-    '.gdl-player-nav{position:absolute;top:0;bottom:0;width:40%;background:transparent;border:none;cursor:pointer}',
+    '.gdl-player-close{position:absolute;top:12px;right:12px;z-index:10;background:rgba(0,0,0,.5);border:none;color:#fff;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center}',
+    '.gdl-player-nav{position:absolute;top:0;bottom:0;width:40%;background:transparent;border:none;cursor:pointer;z-index:1}',
     '.gdl-player-prev{left:0}',
     '.gdl-player-next{right:0}',
     // Progress bars
-    '.gdl-progress-bar{display:flex;gap:4px;position:absolute;top:8px;left:12px;right:12px}',
+    '.gdl-progress-bar{display:flex;gap:4px;position:absolute;top:8px;left:12px;right:12px;z-index:10}',
     '.gdl-progress-seg{flex:1;height:3px;background:rgba(255,255,255,.3);border-radius:2px;overflow:hidden}',
     '.gdl-progress-fill{height:100%;background:#fff;width:0%;transition:width .1s linear}',
     // Label + mute
     '.gdl-player-label{position:absolute;bottom:20px;left:16px;right:60px;color:#fff;font-size:14px;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,.5)}',
-    '.gdl-player-mute{position:absolute;bottom:20px;right:16px;background:rgba(0,0,0,.5);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}',
+    '.gdl-player-mute{position:absolute;bottom:20px;right:16px;z-index:10;background:rgba(0,0,0,.5);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}',
   ].join('\n');
   document.head.appendChild(style);
 
@@ -148,7 +148,10 @@
       else closePlayer();
     });
 
-    closeBtn.addEventListener('click', closePlayer);
+    closeBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      closePlayer();
+    });
 
     prevBtn.addEventListener('click', function () {
       if (currentIndex > 0) loadVideo(currentIndex - 1);
