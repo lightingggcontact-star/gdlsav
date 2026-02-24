@@ -677,16 +677,15 @@ export interface ShopifyProductResult {
   title: string
   handle: string
   imageUrl: string | null
+  status: string
 }
 
 export async function searchProducts(query: string): Promise<ShopifyProductResult[]> {
   const trimmed = query.trim()
   if (!trimmed) return []
 
-  const shopifyQuery = `${trimmed} status:active`
-
   const response = await shopifyGraphQL(SEARCH_PRODUCTS_QUERY, {
-    query: shopifyQuery,
+    query: trimmed,
   })
 
   if (response.errors?.length) {
@@ -707,6 +706,7 @@ export async function searchProducts(query: string): Promise<ShopifyProductResul
       title: node.title,
       handle: node.handle,
       imageUrl: node.featuredImage?.url ?? null,
+      status: (node.status as string)?.toLowerCase() ?? "active",
     }
   })
 }
@@ -771,6 +771,7 @@ const COLLECTION_PRODUCTS_QUERY = `
             title
             handle
             featuredImage { url }
+            status
           }
         }
       }
@@ -799,6 +800,7 @@ export async function getCollectionProducts(collectionGid: string): Promise<Shop
       title: node.title,
       handle: node.handle,
       imageUrl: node.featuredImage?.url ?? null,
+      status: (node.status as string)?.toLowerCase() ?? "active",
     }
   })
 }
@@ -812,6 +814,7 @@ const ALL_PRODUCTS_QUERY = `
           title
           handle
           featuredImage { url }
+          status
         }
       }
     }
@@ -839,6 +842,7 @@ export async function getAllProducts(): Promise<ShopifyProductResult[]> {
       title: node.title,
       handle: node.handle,
       imageUrl: node.featuredImage?.url ?? null,
+      status: (node.status as string)?.toLowerCase() ?? "active",
     }
   })
 }

@@ -21,6 +21,7 @@ import type { StoryVideo } from "@/lib/types"
 interface ProductTag {
   id: string
   title: string
+  status?: string
 }
 
 // ─── Product Search Input ───
@@ -67,7 +68,7 @@ function ProductSearchInput({
         const res = await fetch(`/api/shopify/search-products?q=${encodeURIComponent(query)}`)
         const data = await res.json()
         setResults(
-          (data.products ?? []).map((p: any) => ({ id: p.numericId, title: p.title }))
+          (data.products ?? []).map((p: any) => ({ id: p.numericId, title: p.title, status: p.status }))
         )
         setOpen(true)
       } catch {
@@ -106,6 +107,7 @@ function ProductSearchInput({
       const products: ProductTag[] = (data.products ?? []).map((p: any) => ({
         id: p.numericId,
         title: p.title,
+        status: p.status,
       }))
       onBulkAdd(products)
     } catch {
@@ -124,6 +126,7 @@ function ProductSearchInput({
       const products: ProductTag[] = (data.products ?? []).map((p: any) => ({
         id: p.numericId,
         title: p.title,
+        status: p.status,
       }))
       onBulkAdd(products)
     } catch {
@@ -160,9 +163,14 @@ function ProductSearchInput({
                       setQuery("")
                       setOpen(false)
                     }}
-                    className="block w-full px-3 py-2 text-left text-[13px] hover:bg-secondary transition-colors"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] hover:bg-secondary transition-colors"
                   >
-                    {p.title}
+                    <span className="flex-1">{p.title}</span>
+                    {p.status && p.status !== "active" && (
+                      <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-700">
+                        Non répertorié
+                      </span>
+                    )}
                   </button>
                 ))}
             </div>
@@ -208,6 +216,9 @@ function ProductSearchInput({
               className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium"
             >
               {p.title}
+              {p.status && p.status !== "active" && (
+                <span className="rounded bg-amber-100 px-1 text-[9px] text-amber-700">NR</span>
+              )}
               <button onClick={() => onRemove(p.id)} className="text-muted-foreground hover:text-foreground">
                 <X className="h-3 w-3" />
               </button>
