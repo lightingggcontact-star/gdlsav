@@ -16,7 +16,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { ArrowUpDown, ExternalLink, Copy, StickyNote } from "lucide-react"
+import { ArrowUpDown, Copy, StickyNote, Store, Package } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import type { EnrichedOrder, LaPosteTracking, Segment, ShippingThresholds, ShippingStatus } from "@/lib/types"
@@ -70,7 +70,6 @@ function getAvatarStyle(name: string): React.CSSProperties {
 
 function DurationBar({ days, effectiveStatus, threshold }: { days: number; effectiveStatus: ShippingStatus; threshold: number }) {
   const pct = Math.min((days / (threshold * 2)) * 100, 100)
-  // Delivered / pickup_ready / out_for_delivery → always green (no alert)
   const isOk = effectiveStatus === "delivered" || effectiveStatus === "pickup_ready" || effectiveStatus === "out_for_delivery"
   const isDelayed = !isOk && (effectiveStatus === "delayed" || effectiveStatus === "problem" || effectiveStatus === "returned")
   return (
@@ -89,6 +88,50 @@ function DurationBar({ days, effectiveStatus, threshold }: { days: number; effec
   )
 }
 
+function ActionButton({
+  icon: Icon,
+  tooltip,
+  onClick,
+  href,
+}: {
+  icon: React.ElementType
+  tooltip: string
+  onClick?: (e: React.MouseEvent) => void
+  href?: string
+}) {
+  const btn = (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {href ? (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          >
+            <Icon className="h-3.5 w-3.5" />
+          </a>
+        ) : (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onClick?.(e)
+            }}
+            className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          >
+            <Icon className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </TooltipTrigger>
+      <TooltipContent side="top" className="text-[11px]">
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
+  )
+  return btn
+}
+
 export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds, onSelectionChange, segments, orderNotes = {}, thresholds }: ShippingTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("alertLevel")
   const [sortDir, setSortDir] = useState<SortDirection>("asc")
@@ -104,7 +147,6 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
     }
   }
 
-  // Derive effective status — La Poste is the single source of truth
   const getEffectiveStatus = useCallback((order: EnrichedOrder): ShippingStatus => {
     const lp = order.trackingNumber ? trackingMap[order.trackingNumber] : undefined
     return deriveShippingStatus(
@@ -167,7 +209,7 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
     onSelectionChange(next)
   }
 
-  // --- Drag-select (like Google Sheets) ---
+  // --- Drag-select ---
   const dragRef = useRef<{ active: boolean; action: "select" | "deselect"; ids: Set<string> } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
 
@@ -240,11 +282,10 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
               </TableHead>
               <SortHeader label="Commande" sortKeyName="orderName" />
               <SortHeader label="Client" sortKeyName="customerName" />
-              <SortHeader label="Pays" sortKeyName="countryCode" />
               <SortHeader label="Expédié" sortKeyName="shippedAt" />
               <SortHeader label="Durée" sortKeyName="businessDaysElapsed" />
-              <TableHead>Tracking</TableHead>
               <SortHeader label="Statut" sortKeyName="alertLevel" />
+              <TableHead className="text-right w-28">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -260,6 +301,12 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
               const orderNote = orderNotes[order.id] || ""
               const segNotes = segs.map((s) => s.notes[order.id]).filter(Boolean)
               const notePreview = orderNote || segNotes[0] || ""
+
+              const shopifyNumericId = order.id.split("/").pop()
+              const shopifyUrl = `https://admin.shopify.com/store/grainedelascars/orders/${shopifyNumericId}`
+              const laPosteUrl = order.trackingNumber
+                ? `https://www.laposte.fr/outils/suivre-vos-envois?code=${order.trackingNumber}`
+                : undefined
 
               return (
                 <TableRow
@@ -287,6 +334,8 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
                       aria-label={`Sélectionner ${order.orderName}`}
                     />
                   </TableCell>
+
+                  {/* Commande */}
                   <TableCell>
                     <div className="flex items-center gap-1.5">
                       <span className="font-medium text-sm">{order.orderName}</span>
@@ -315,6 +364,8 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
                       )}
                     </div>
                   </TableCell>
+
+                  {/* Client + country flag */}
                   <TableCell>
                     <div className="flex items-center gap-2.5">
                       <div
@@ -324,67 +375,60 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
                         {getInitials(order.customerName)}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm truncate">{order.customerName}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm truncate">{order.customerName}</p>
+                          <span className="text-xs shrink-0" title={order.countryCode}>{getCountryFlag(order.countryCode)}</span>
+                        </div>
                         <p className="text-[11px] text-muted-foreground truncate">{order.customerEmail}</p>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <span className="text-sm">{getCountryFlag(order.countryCode)} {order.countryCode}</span>
-                  </TableCell>
+
+                  {/* Expédié */}
                   <TableCell className="text-sm text-muted-foreground">{formatDateFR(order.shippedAt)}</TableCell>
+
+                  {/* Durée */}
                   <TableCell>
                     <DurationBar days={order.businessDaysElapsed} effectiveStatus={effectiveStatus} threshold={threshold} />
                   </TableCell>
+
+                  {/* Statut + La Poste last event */}
                   <TableCell>
-                    {order.trackingUrl ? (
-                      <a
-                        href={order.trackingUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-[#005BD3] hover:underline inline-flex items-center gap-1 text-xs"
-                      >
-                        Suivre <ExternalLink className="h-3 w-3" />
-                      </a>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">—</span>
-                    )}
+                    <div className="space-y-0.5">
+                      <Badge variant="outline" className={cn("text-[10px] font-medium", statusConfig.badgeClassName)}>
+                        {statusConfig.label}
+                      </Badge>
+                      {tracking?.lastEventLabel && (
+                        <p className="text-[10px] text-muted-foreground/70 truncate max-w-36">
+                          {tracking.lastEventLabel}
+                        </p>
+                      )}
+                    </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Tooltip>
-                        <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Badge variant="outline" className={cn("text-[10px] font-medium cursor-default", statusConfig.badgeClassName)}>
-                            {statusConfig.label}
-                          </Badge>
-                        </TooltipTrigger>
-                        <TooltipContent side="left" className="max-w-64 text-[12px]">
-                          {tracking ? (
-                            <>
-                              <p>{tracking.lastEventLabel}</p>
-                              {tracking.lastEventDate && (
-                                <p className="text-[11px] opacity-70 mt-0.5">
-                                  {new Date(tracking.lastEventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                                </p>
-                              )}
-                            </>
-                          ) : (
-                            <p>{order.businessDaysElapsed}j ouvrés depuis l&apos;expédition</p>
-                          )}
-                        </TooltipContent>
-                      </Tooltip>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
+
+                  {/* Action buttons */}
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <ActionButton
+                        icon={Store}
+                        tooltip="Ouvrir dans Shopify"
+                        href={shopifyUrl}
+                      />
+                      {laPosteUrl && (
+                        <ActionButton
+                          icon={Package}
+                          tooltip="Suivi La Poste"
+                          href={laPosteUrl}
+                        />
+                      )}
+                      <ActionButton
+                        icon={Copy}
+                        tooltip="Copier email"
+                        onClick={() => {
                           navigator.clipboard.writeText(order.customerEmail)
                           toast.success("Email copié")
                         }}
-                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
-                        title="Copier email"
-                      >
-                        <Copy className="h-3 w-3" />
-                      </button>
+                      />
                     </div>
                   </TableCell>
                 </TableRow>
