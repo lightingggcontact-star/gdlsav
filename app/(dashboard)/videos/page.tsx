@@ -14,6 +14,7 @@ import {
   Search,
   Loader2,
   ChevronDown,
+  Check,
 } from "lucide-react"
 import { useSupabase } from "@/lib/supabase/use-supabase"
 import type { StoryVideo } from "@/lib/types"
@@ -353,6 +354,11 @@ export default function VideosPage() {
   const [editFile, setEditFile] = useState<File | null>(null)
   const [editPreview, setEditPreview] = useState<string | null>(null)
 
+  // All products for edit dialog
+  const [allProducts, setAllProducts] = useState<ProductTag[]>([])
+  const [allProductsLoading, setAllProductsLoading] = useState(false)
+  const [editFilter, setEditFilter] = useState("")
+
   const fetchVideos = useCallback(async () => {
     try {
       const res = await fetch("/api/stories/videos")
@@ -379,6 +385,7 @@ export default function VideosPage() {
     setEditingVideo(null)
     setBatchFiles([])
     setBatchProgress(null)
+    setEditFilter("")
     setDialogOpen(false)
   }
 
@@ -520,11 +527,33 @@ export default function VideosPage() {
     fetchVideos()
   }
 
+  async function fetchAllProducts() {
+    if (allProducts.length > 0) return
+    setAllProductsLoading(true)
+    try {
+      const res = await fetch("/api/shopify/search-products?all=true")
+      const data = await res.json()
+      setAllProducts(
+        (data.products ?? []).map((p: any) => ({
+          id: p.numericId,
+          title: p.title,
+          status: p.status,
+          imageUrl: p.imageUrl,
+        }))
+      )
+    } catch {
+      // silent
+    } finally {
+      setAllProductsLoading(false)
+    }
+  }
+
   function handleEdit(video: StoryVideo) {
     setEditingVideo(video)
     setUploadName(video.name)
     setEditFile(null)
     setEditPreview(video.thumbnail_url)
+    setEditFilter("")
     setUploadProducts(
       video.stories_video_products.map((p) => ({
         id: p.shopify_product_id,
@@ -533,6 +562,7 @@ export default function VideosPage() {
     )
     setBatchFiles([])
     setDialogOpen(true)
+    fetchAllProducts()
   }
 
   async function handleReorder(newOrder: StoryVideo[]) {
@@ -791,13 +821,51 @@ export default function VideosPage() {
       )}
 
       {/* Edit Dialog */}
-      {dialogOpen && editingVideo && (
+      {dialogOpen && editingVideo && (() => {
+        const selectedIds = new Set(uploadProducts.map((p) => p.id))
+        const filterLower = editFilter.toLowerCase()
+        const filtered = allProducts.filter((p) =>
+          !filterLower || p.title.toLowerCase().includes(filterLower)
+        )
+        // Sort: selected first, then alphabetical
+        const sorted = [...filtered].sort((a, b) => {
+          const aSelected = selectedIds.has(a.id) ? 0 : 1
+          const bSelected = selectedIds.has(b.id) ? 0 : 1
+          if (aSelected !== bSelected) return aSelected - bSelected
+          return a.title.localeCompare(b.title)
+        })
+
+        function toggleProduct(p: ProductTag) {
+          if (selectedIds.has(p.id)) {
+            setUploadProducts((prev) => prev.filter((x) => x.id !== p.id))
+          } else {
+            setUploadProducts((prev) => [...prev, p])
+          }
+        }
+
+        function toggleAll() {
+          if (filtered.every((p) => selectedIds.has(p.id))) {
+            // Deselect all filtered
+            const filterIds = new Set(filtered.map((p) => p.id))
+            setUploadProducts((prev) => prev.filter((p) => !filterIds.has(p.id)))
+          } else {
+            // Select all filtered
+            setUploadProducts((prev) => {
+              const ids = new Set(prev.map((p) => p.id))
+              return [...prev, ...filtered.filter((p) => !ids.has(p.id))]
+            })
+          }
+        }
+
+        const allFilteredSelected = filtered.length > 0 && filtered.every((p) => selectedIds.has(p.id))
+
+        return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4" onClick={() => resetDialog()}>
           <div
-            className="flex w-full sm:max-w-lg flex-col rounded-t-2xl sm:rounded-xl border border-border bg-card shadow-xl max-h-[92vh] sm:max-h-[85vh]"
+            className="flex w-full sm:max-w-lg flex-col rounded-t-2xl sm:rounded-xl border border-border bg-card shadow-xl max-h-[95vh] sm:max-h-[88vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header fixe */}
+            {/* Header */}
             <div className="flex items-center justify-between border-b border-border px-5 py-3.5 shrink-0">
               <h3 className="text-[15px] font-semibold text-foreground">Modifier la vidéo</h3>
               <button onClick={resetDialog} className="rounded-lg p-1 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
@@ -806,7 +874,7 @@ export default function VideosPage() {
             </div>
 
             {/* Contenu scrollable */}
-            <div className="flex-1 overflow-y-auto overscroll-contain">
+            <div className="flex-1 overflow-y-auto overscroll-contain min-h-0">
               {/* Preview vidéo + nom */}
               <div className="flex items-start gap-4 border-b border-border px-5 py-4">
                 <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 border-purple-500/60 bg-secondary shadow-sm">
@@ -830,32 +898,113 @@ export default function VideosPage() {
                 </div>
               </div>
 
-              {/* Produits associés */}
-              <div className="px-5 py-4 space-y-3">
-                <div className="flex items-center justify-between">
+              {/* Produits */}
+              <div className="px-5 pt-4 pb-2">
+                <div className="flex items-center justify-between mb-3">
                   <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                     Produits associés
                   </label>
-                  <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-                    {uploadProducts.length}
+                  <span className="rounded-full bg-[#007AFF]/10 px-2.5 py-0.5 text-[11px] font-semibold text-[#007AFF]">
+                    {uploadProducts.length} sélectionné{uploadProducts.length > 1 ? "s" : ""}
                   </span>
                 </div>
-                <ProductSearchInput
-                  selected={uploadProducts}
-                  onAdd={(p) => setUploadProducts((prev) => [...prev, p])}
-                  onRemove={(id) => setUploadProducts((prev) => prev.filter((p) => p.id !== id))}
-                  onBulkAdd={(products) => {
-                    setUploadProducts((prev) => {
-                      const ids = new Set(prev.map((p) => p.id))
-                      return [...prev, ...products.filter((p) => !ids.has(p.id))]
-                    })
-                  }}
-                />
+
+                {/* Search + select all */}
+                <div className="flex gap-2 mb-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={editFilter}
+                      onChange={(e) => setEditFilter(e.target.value)}
+                      placeholder="Filtrer les produits..."
+                      className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-[13px] outline-none focus:border-[#007AFF]"
+                    />
+                  </div>
+                  <button
+                    onClick={toggleAll}
+                    className={`shrink-0 rounded-lg border px-3 py-2 text-[11px] font-medium transition-colors ${
+                      allFilteredSelected
+                        ? "border-[#007AFF] bg-[#007AFF]/10 text-[#007AFF]"
+                        : "border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    }`}
+                  >
+                    {allFilteredSelected ? "Tout désélect." : "Tout sélect."}
+                  </button>
+                </div>
+              </div>
+
+              {/* Product list */}
+              <div className="px-5 pb-4">
+                {allProductsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-[12px] text-muted-foreground">Chargement des produits...</span>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {sorted.map((p) => {
+                      const isSelected = selectedIds.has(p.id)
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => toggleProduct(p)}
+                          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                            isSelected
+                              ? "bg-[#007AFF]/5 border border-[#007AFF]/20"
+                              : "hover:bg-secondary border border-transparent"
+                          }`}
+                        >
+                          {/* Checkbox */}
+                          <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
+                            isSelected
+                              ? "border-[#007AFF] bg-[#007AFF]"
+                              : "border-border"
+                          }`}>
+                            {isSelected && <Check className="h-3 w-3 text-white" />}
+                          </div>
+
+                          {/* Product image */}
+                          <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-secondary">
+                            {p.imageUrl ? (
+                              <img src={p.imageUrl} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                                <Video className="h-4 w-4" />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Title + status */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-medium truncate">{p.title}</p>
+                          </div>
+
+                          {/* Status */}
+                          {p.status && p.status !== "active" ? (
+                            <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-medium text-amber-700">
+                              Non répertorié
+                            </span>
+                          ) : (
+                            <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-medium text-emerald-700">
+                              Actif
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                    {filtered.length === 0 && !allProductsLoading && (
+                      <p className="py-6 text-center text-[12px] text-muted-foreground">
+                        {editFilter ? "Aucun produit trouvé" : "Aucun produit"}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Boutons sticky en bas */}
-            <div className="flex items-center justify-between border-t border-border px-5 py-3.5 shrink-0 bg-card">
+            {/* Footer sticky */}
+            <div className="flex items-center justify-between border-t border-border px-5 py-3.5 shrink-0 bg-card rounded-b-xl">
               <button
                 onClick={resetDialog}
                 className="rounded-lg px-4 py-2 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors"
@@ -873,7 +1022,8 @@ export default function VideosPage() {
             </div>
           </div>
         </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
