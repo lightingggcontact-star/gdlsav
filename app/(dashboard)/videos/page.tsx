@@ -754,19 +754,21 @@ export default function VideosPage() {
 
       {/* Edit Dialog */}
       {dialogOpen && editingVideo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => resetDialog()}>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40" onClick={() => resetDialog()}>
           <div
-            className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl"
+            className="flex w-full max-w-md flex-col rounded-t-xl sm:rounded-lg border border-border bg-card shadow-xl max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-4 flex items-center justify-between">
+            {/* Header fixe */}
+            <div className="flex items-center justify-between border-b border-border px-6 py-4 shrink-0">
               <h3 className="text-[15px] font-semibold text-foreground">Modifier la vidéo</h3>
               <button onClick={resetDialog} className="text-muted-foreground hover:text-foreground">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="space-y-4">
+            {/* Contenu scrollable */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
               {/* Preview thumbnail */}
               {editPreview && (
                 <div className="flex items-center gap-3">
@@ -792,7 +794,7 @@ export default function VideosPage() {
               {/* Produits */}
               <div>
                 <label className="mb-1 block text-[12px] font-medium text-foreground">
-                  Produits associés
+                  Produits associés ({uploadProducts.length})
                 </label>
                 <ProductSearchInput
                   selected={uploadProducts}
@@ -806,24 +808,24 @@ export default function VideosPage() {
                   }}
                 />
               </div>
+            </div>
 
-              {/* Boutons */}
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  onClick={resetDialog}
-                  className="rounded-lg px-4 py-2 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Annuler
-                </button>
-                <button
-                  onClick={handleEditSave}
-                  disabled={uploading || !uploadName}
-                  className="flex items-center gap-2 rounded-lg bg-[#007AFF] px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[#0066DD] disabled:opacity-50"
-                >
-                  {uploading && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {uploading ? "Sauvegarde..." : "Sauvegarder"}
-                </button>
-              </div>
+            {/* Boutons sticky en bas */}
+            <div className="flex justify-end gap-2 border-t border-border px-6 py-4 shrink-0">
+              <button
+                onClick={resetDialog}
+                className="rounded-lg px-4 py-2 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleEditSave}
+                disabled={uploading || !uploadName}
+                className="flex items-center gap-2 rounded-lg bg-[#007AFF] px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[#0066DD] disabled:opacity-50"
+              >
+                {uploading && <Loader2 className="h-4 w-4 animate-spin" />}
+                {uploading ? "Sauvegarde..." : "Sauvegarder"}
+              </button>
             </div>
           </div>
         </div>
