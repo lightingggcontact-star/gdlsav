@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/refresh-tracking",
+      "schedule": "25 7 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-tracking",
+      "schedule": "0 12 * * *"
+    }
+  ]
+}

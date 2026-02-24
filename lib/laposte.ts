@@ -1,4 +1,4 @@
-import type { LaPosteTracking, LaPosteShipment } from "./types"
+import type { LaPosteTracking, LaPosteShipment, ShippingStatus } from "./types"
 
 const API_KEY = process.env.LAPOSTE_API_KEY
 const BASE_URL = "https://api.laposte.fr/suivi/v2/idships"
@@ -9,16 +9,22 @@ const PROBLEM_CODES = new Set(["PB1", "ND1", "DO3", "DI3"])
 const RETURN_CODES = new Set(["RE1", "DI2"])
 // Event codes that indicate delivered
 const DELIVERED_CODES = new Set(["DI0", "DI1"])
+// Event codes that indicate available at pickup point
+const PICKUP_CODES = new Set(["AG1", "RE0"])
+// Event codes that indicate out for delivery
+const OUT_FOR_DELIVERY_CODES = new Set(["DR1", "MD2"])
 
 function deriveStatusSummary(
   shipment: LaPosteShipment
-): LaPosteTracking["statusSummary"] {
+): ShippingStatus | "unknown" {
   if (!shipment.event?.length) return "unknown"
 
   // Check most recent event first
   const latestCode = shipment.event[0]?.code
   if (DELIVERED_CODES.has(latestCode)) return "delivered"
   if (RETURN_CODES.has(latestCode)) return "returned"
+  if (PICKUP_CODES.has(latestCode)) return "pickup_ready"
+  if (OUT_FOR_DELIVERY_CODES.has(latestCode)) return "out_for_delivery"
   if (PROBLEM_CODES.has(latestCode)) return "problem"
 
   // Also check if isFinal and deliveryDate exists

@@ -1,4 +1,4 @@
-import type { ShopifyOrder, EnrichedOrder, ShippingThresholds } from "./types"
+import type { ShopifyOrder, EnrichedOrder, ShippingThresholds, ShippingStatus } from "./types"
 
 /**
  * Get the effective ship date considering:
@@ -48,26 +48,108 @@ export function calculateBusinessDays(from: Date, to: Date): number {
 }
 
 /**
- * Determine alert level for an order based on shipment status and elapsed business days.
+ * Shipping status config — label, colors, badge classes for each ShippingStatus.
  */
-export function getAlertLevel(
+export interface ShippingStatusConfig {
+  label: string
+  badgeClassName: string
+  iconBg: string
+  iconColor: string
+  valueColor: string
+}
+
+const STATUS_CONFIGS: Record<ShippingStatus, ShippingStatusConfig> = {
+  delivered: {
+    label: "Livré",
+    badgeClassName: "bg-[#CDFED4] text-[#047B5D] border-transparent",
+    iconBg: "bg-[#CDFED4]",
+    iconColor: "text-[#047B5D]",
+    valueColor: "text-[#047B5D]",
+  },
+  pickup_ready: {
+    label: "Dispo retrait",
+    badgeClassName: "bg-[#EAF4FF] text-[#005BD3] border-transparent",
+    iconBg: "bg-[#EAF4FF]",
+    iconColor: "text-[#005BD3]",
+    valueColor: "text-[#005BD3]",
+  },
+  out_for_delivery: {
+    label: "En livraison",
+    badgeClassName: "bg-[#EAF4FF] text-[#005BD3] border-transparent",
+    iconBg: "bg-[#EAF4FF]",
+    iconColor: "text-[#005BD3]",
+    valueColor: "text-[#005BD3]",
+  },
+  in_transit: {
+    label: "En transit",
+    badgeClassName: "bg-[#FFF1E3] text-[#8A6116] border-transparent",
+    iconBg: "bg-[#FFF1E3]",
+    iconColor: "text-[#8A6116]",
+    valueColor: "text-[#8A6116]",
+  },
+  delayed: {
+    label: "Retard",
+    badgeClassName: "bg-[#FEE8EB] text-[#C70A24] border-transparent",
+    iconBg: "bg-[#FEE8EB]",
+    iconColor: "text-[#C70A24]",
+    valueColor: "text-[#C70A24]",
+  },
+  problem: {
+    label: "Problème",
+    badgeClassName: "bg-[#FEE8EB] text-[#C70A24] border-transparent",
+    iconBg: "bg-[#FEE8EB]",
+    iconColor: "text-[#C70A24]",
+    valueColor: "text-[#C70A24]",
+  },
+  returned: {
+    label: "Retourné",
+    badgeClassName: "bg-[#F3E8FF] text-[#7C3AED] border-transparent",
+    iconBg: "bg-[#F3E8FF]",
+    iconColor: "text-[#7C3AED]",
+    valueColor: "text-[#7C3AED]",
+  },
+}
+
+export function getShippingStatusConfig(status: ShippingStatus | "unknown"): ShippingStatusConfig {
+  if (status === "unknown") {
+    return {
+      label: "Inconnu",
+      badgeClassName: "bg-secondary text-muted-foreground border-transparent",
+      iconBg: "bg-secondary",
+      iconColor: "text-muted-foreground",
+      valueColor: "text-foreground",
+    }
+  }
+  return STATUS_CONFIGS[status]
+}
+
+/**
+ * Derive shipping status from La Poste status, Shopify status, and business days.
+ */
+export function deriveShippingStatus(
+  laPosteStatus: ShippingStatus | "unknown" | undefined,
   shipmentStatus: string | null,
   businessDays: number,
   countryCode: string,
   thresholds: ShippingThresholds
-): "delayed" | "in_transit" | "delivered" {
-  // Delivered or ready for pickup
-  if (
-    shipmentStatus === "DELIVERED" ||
-    shipmentStatus === "READY_FOR_PICKUP"
-  ) {
+): ShippingStatus {
+  // If La Poste gives us a real status, use it (with delay override)
+  if (laPosteStatus && laPosteStatus !== "unknown") {
+    // If La Poste says in_transit but we're past threshold → delayed
+    if (laPosteStatus === "in_transit") {
+      const threshold = countryCode === "BE" ? thresholds.be : thresholds.fr
+      if (businessDays > threshold) return "delayed"
+    }
+    return laPosteStatus
+  }
+
+  // Fallback: Shopify status
+  if (shipmentStatus === "DELIVERED" || shipmentStatus === "READY_FOR_PICKUP") {
     return "delivered"
   }
 
   // Check delay threshold based on country
-  const threshold =
-    countryCode === "BE" ? thresholds.be : thresholds.fr
-
+  const threshold = countryCode === "BE" ? thresholds.be : thresholds.fr
   if (businessDays > threshold) {
     return "delayed"
   }
@@ -92,7 +174,8 @@ export function enrichOrders(
     const shipmentStatus = fulfillment?.shipmentStatus ?? null
     const countryCode = order.shippingAddress.countryCode
 
-    const alertLevel = getAlertLevel(
+    const alertLevel = deriveShippingStatus(
+      undefined,
       shipmentStatus,
       businessDays,
       countryCode,
@@ -111,7 +194,7 @@ export function enrichOrders(
       trackingUrl: fulfillment?.trackingUrl ?? null,
       shipmentStatus,
       businessDaysElapsed: businessDays,
-      isDelayed: alertLevel === "delayed",
+      isDelayed: alertLevel === "delayed" || alertLevel === "problem" || alertLevel === "returned",
       alertLevel,
     }
   })

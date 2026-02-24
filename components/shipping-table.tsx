@@ -16,11 +16,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { ArrowUpDown, ExternalLink, Loader2, Copy, StickyNote } from "lucide-react"
+import { ArrowUpDown, ExternalLink, Copy, StickyNote } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import type { EnrichedOrder, LaPosteTracking, Segment } from "@/lib/types"
-import { formatDateFR, getCountryFlag } from "@/lib/shipping-utils"
+import type { EnrichedOrder, LaPosteTracking, Segment, ShippingThresholds, ShippingStatus } from "@/lib/types"
+import { formatDateFR, getCountryFlag, getShippingStatusConfig, deriveShippingStatus } from "@/lib/shipping-utils"
 import { getSegmentColor } from "@/lib/segments"
 
 type SortKey = "orderName" | "customerName" | "countryCode" | "shippedAt" | "businessDaysElapsed" | "alertLevel"
@@ -34,20 +34,17 @@ interface ShippingTableProps {
   onSelectionChange: (ids: Set<string>) => void
   segments: Segment[]
   orderNotes?: Record<string, string>
+  thresholds: ShippingThresholds
 }
 
-const alertBadge = {
-  delayed: { label: "Retard", className: "bg-[#FEE8EB] text-[#C70A24] border-transparent" },
-  in_transit: { label: "En transit", className: "bg-[#FFF1E3] text-[#8A6116] border-transparent" },
-  delivered: { label: "Livré", className: "bg-[#CDFED4] text-[#047B5D] border-transparent" },
-}
-
-const laPosteStatusBadge: Record<string, { label: string; className: string }> = {
-  delivered: { label: "Livré", className: "bg-[#CDFED4] text-[#047B5D] border-transparent" },
-  in_transit: { label: "En transit", className: "bg-[#EAF4FF] text-[#005BD3] border-transparent" },
-  problem: { label: "Problème", className: "bg-[#FEE8EB] text-[#C70A24] border-transparent" },
-  returned: { label: "Retourné", className: "bg-[#F3E8FF] text-[#7C3AED] border-transparent" },
-  unknown: { label: "Inconnu", className: "bg-secondary text-muted-foreground border-transparent" },
+const statusSortOrder: Record<ShippingStatus, number> = {
+  problem: 0,
+  returned: 1,
+  delayed: 2,
+  out_for_delivery: 3,
+  in_transit: 4,
+  pickup_ready: 5,
+  delivered: 6,
 }
 
 function getInitials(name: string): string {
@@ -71,8 +68,11 @@ function getAvatarStyle(name: string): React.CSSProperties {
   return { backgroundColor: p.bg, color: p.fg }
 }
 
-function DurationBar({ days, isDelayed, threshold }: { days: number; isDelayed: boolean; threshold: number }) {
+function DurationBar({ days, effectiveStatus, threshold }: { days: number; effectiveStatus: ShippingStatus; threshold: number }) {
   const pct = Math.min((days / (threshold * 2)) * 100, 100)
+  // Delivered / pickup_ready / out_for_delivery → always green (no alert)
+  const isOk = effectiveStatus === "delivered" || effectiveStatus === "pickup_ready" || effectiveStatus === "out_for_delivery"
+  const isDelayed = !isOk && (effectiveStatus === "delayed" || effectiveStatus === "problem" || effectiveStatus === "returned")
   return (
     <div className="flex items-center gap-2">
       <span className={cn("text-sm tabular-nums", isDelayed ? "text-[#C70A24] font-medium" : "text-foreground")}>{days}j</span>
@@ -80,7 +80,7 @@ function DurationBar({ days, isDelayed, threshold }: { days: number; isDelayed: 
         <div
           className={cn(
             "h-full rounded-full",
-            isDelayed ? "bg-[#C70A24]" : days >= threshold ? "bg-[#E67C00]" : "bg-[#047B5D]"
+            isOk ? "bg-[#047B5D]" : isDelayed ? "bg-[#C70A24]" : days >= threshold ? "bg-[#E67C00]" : "bg-[#047B5D]"
           )}
           style={{ width: `${pct}%` }}
         />
@@ -89,7 +89,7 @@ function DurationBar({ days, isDelayed, threshold }: { days: number; isDelayed: 
   )
 }
 
-export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds, onSelectionChange, segments, orderNotes = {} }: ShippingTableProps) {
+export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds, onSelectionChange, segments, orderNotes = {}, thresholds }: ShippingTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("alertLevel")
   const [sortDir, setSortDir] = useState<SortDirection>("asc")
   const [page, setPage] = useState(0)
@@ -104,12 +104,28 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
     }
   }
 
+  // Derive effective status for each order (La Poste when available)
+  const getEffectiveStatus = useCallback((order: EnrichedOrder): ShippingStatus => {
+    const lp = order.trackingNumber ? trackingMap[order.trackingNumber] : undefined
+    if (lp && lp.statusSummary !== "unknown") {
+      return deriveShippingStatus(
+        lp.statusSummary,
+        order.shipmentStatus,
+        order.businessDaysElapsed,
+        order.countryCode,
+        thresholds
+      )
+    }
+    return order.alertLevel
+  }, [trackingMap, thresholds])
+
   const sorted = useMemo(() => {
-    const sortOrder = { delayed: 0, in_transit: 1, delivered: 2 }
     return [...orders].sort((a, b) => {
       let cmp = 0
       if (sortKey === "alertLevel") {
-        cmp = sortOrder[a.alertLevel] - sortOrder[b.alertLevel]
+        const statusA = getEffectiveStatus(a)
+        const statusB = getEffectiveStatus(b)
+        cmp = statusSortOrder[statusA] - statusSortOrder[statusB]
       } else if (sortKey === "businessDaysElapsed") {
         cmp = a.businessDaysElapsed - b.businessDaysElapsed
       } else if (sortKey === "shippedAt") {
@@ -119,7 +135,7 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
       }
       return sortDir === "asc" ? cmp : -cmp
     })
-  }, [orders, sortKey, sortDir])
+  }, [orders, sortKey, sortDir, getEffectiveStatus])
 
   const totalPages = Math.ceil(sorted.length / perPage)
   const paginated = sorted.slice(page * perPage, (page + 1) * perPage)
@@ -232,16 +248,17 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
               <SortHeader label="Expédié" sortKeyName="shippedAt" />
               <SortHeader label="Durée" sortKeyName="businessDaysElapsed" />
               <TableHead>Tracking</TableHead>
-              <SortHeader label="Statut La Poste" sortKeyName="alertLevel" />
+              <SortHeader label="Statut" sortKeyName="alertLevel" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {paginated.map((order) => {
-              const badge = alertBadge[order.alertLevel]
               const tracking = order.trackingNumber
                 ? trackingMap[order.trackingNumber]
                 : undefined
-              const threshold = order.countryCode === "BE" ? 5 : 3
+              const effectiveStatus = getEffectiveStatus(order)
+              const statusConfig = getShippingStatusConfig(effectiveStatus)
+              const threshold = order.countryCode === "BE" ? thresholds.be : thresholds.fr
               const isSelected = selectedIds.has(order.id)
               const segs = orderSegments[order.id] ?? []
               const orderNote = orderNotes[order.id] || ""
@@ -254,7 +271,7 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
                   onClick={() => onSelectOrder(order)}
                   className={cn(
                     "cursor-pointer group",
-                    order.isDelayed && "delayed-row",
+                    (effectiveStatus === "delayed" || effectiveStatus === "problem" || effectiveStatus === "returned") && "delayed-row",
                     isSelected && "bg-[#F3E8FF]"
                   )}
                 >
@@ -321,7 +338,7 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{formatDateFR(order.shippedAt)}</TableCell>
                   <TableCell>
-                    <DurationBar days={order.businessDaysElapsed} isDelayed={order.isDelayed} threshold={threshold} />
+                    <DurationBar days={order.businessDaysElapsed} effectiveStatus={effectiveStatus} threshold={threshold} />
                   </TableCell>
                   <TableCell>
                     {order.trackingUrl ? (
@@ -340,29 +357,27 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      {tracking ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
-                            <Badge variant="outline" className={cn("text-[10px] font-medium cursor-default", laPosteStatusBadge[tracking.statusSummary]?.className)}>
-                              {laPosteStatusBadge[tracking.statusSummary]?.label}
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent side="left" className="max-w-64 text-[12px]">
-                            <p>{tracking.lastEventLabel}</p>
-                            {tracking.lastEventDate && (
-                              <p className="text-[11px] opacity-70 mt-0.5">
-                                {new Date(tracking.lastEventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                              </p>
-                            )}
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : order.trackingNumber ? (
-                        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                      ) : (
-                        <Badge variant="outline" className={cn("text-[10px] font-medium", badge.className)}>
-                          {badge.label}
-                        </Badge>
-                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Badge variant="outline" className={cn("text-[10px] font-medium cursor-default", statusConfig.badgeClassName)}>
+                            {statusConfig.label}
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent side="left" className="max-w-64 text-[12px]">
+                          {tracking ? (
+                            <>
+                              <p>{tracking.lastEventLabel}</p>
+                              {tracking.lastEventDate && (
+                                <p className="text-[11px] opacity-70 mt-0.5">
+                                  {new Date(tracking.lastEventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                                </p>
+                              )}
+                            </>
+                          ) : (
+                            <p>{order.businessDaysElapsed}j ouvrés depuis l&apos;expédition</p>
+                          )}
+                        </TooltipContent>
+                      </Tooltip>
                       <button
                         onClick={(e) => {
                           e.stopPropagation()

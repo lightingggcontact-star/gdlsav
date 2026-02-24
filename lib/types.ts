@@ -33,7 +33,7 @@ export interface EnrichedOrder {
   shipmentStatus: string | null
   businessDaysElapsed: number
   isDelayed: boolean
-  alertLevel: "delayed" | "in_transit" | "delivered"
+  alertLevel: ShippingStatus
 }
 
 // === La Poste Tracking Types ===
@@ -79,7 +79,7 @@ export interface LaPosteTracking {
   lastEventLabel: string
   lastEventCode: string
   lastEventDate: string
-  statusSummary: "delivered" | "in_transit" | "problem" | "returned" | "unknown"
+  statusSummary: ShippingStatus | "unknown"
 }
 
 // === Settings ===
@@ -90,9 +90,20 @@ export interface ShippingThresholds {
 }
 
 export const DEFAULT_THRESHOLDS: ShippingThresholds = {
-  fr: 3,
-  be: 5,
+  fr: 4,
+  be: 6,
 }
+
+// === Shipping Status (derived from La Poste event codes + business days) ===
+
+export type ShippingStatus =
+  | "delivered"        // Livre (DI0, DI1, isFinal+deliveryDate)
+  | "pickup_ready"     // Disponible en point relais (AG1, RE0)
+  | "out_for_delivery" // En cours de livraison (DR1, MD2)
+  | "in_transit"       // En transit (aucun code special)
+  | "delayed"          // En transit > seuil jours ouvres
+  | "problem"          // Probleme (PB1, ND1, DO3, DI3)
+  | "returned"         // Retourne (RE1, DI2)
 
 // === Segments ===
 

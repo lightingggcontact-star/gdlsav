@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { fetchFulfilledOrders } from "@/lib/shopify"
 import { enrichOrders } from "@/lib/shipping-utils"
 import { DEFAULT_THRESHOLDS } from "@/lib/types"
+import type { ShippingStatus } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
 
@@ -20,19 +21,39 @@ export async function GET(request: NextRequest) {
       be: thresholdBE,
     })
 
-    // Sort: delayed first, then in_transit, then delivered
-    const sortOrder = { delayed: 0, in_transit: 1, delivered: 2 }
+    // Sort: problems first, then delayed, then in_transit, then delivered
+    const sortOrder: Record<ShippingStatus, number> = {
+      problem: 0,
+      returned: 1,
+      delayed: 2,
+      out_for_delivery: 3,
+      in_transit: 4,
+      pickup_ready: 5,
+      delivered: 6,
+    }
     enrichedOrders.sort(
       (a, b) => sortOrder[a.alertLevel] - sortOrder[b.alertLevel]
     )
+
+    // Count per status
+    const counts: Record<ShippingStatus, number> = {
+      delivered: 0,
+      pickup_ready: 0,
+      out_for_delivery: 0,
+      in_transit: 0,
+      delayed: 0,
+      problem: 0,
+      returned: 0,
+    }
+    for (const o of enrichedOrders) {
+      counts[o.alertLevel]++
+    }
 
     return NextResponse.json({
       orders: enrichedOrders,
       stats: {
         total: enrichedOrders.length,
-        delayed: enrichedOrders.filter((o) => o.alertLevel === "delayed").length,
-        inTransit: enrichedOrders.filter((o) => o.alertLevel === "in_transit").length,
-        delivered: enrichedOrders.filter((o) => o.alertLevel === "delivered").length,
+        ...counts,
       },
       fetchedAt: new Date().toISOString(),
     })

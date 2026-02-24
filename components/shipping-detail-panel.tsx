@@ -16,12 +16,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { Copy, ExternalLink, Mail, Loader2, Package, AlertTriangle, RotateCcw, CheckCircle2, Circle, X, StickyNote } from "lucide-react"
-import type { EnrichedOrder, LaPosteTracking, Segment } from "@/lib/types"
+import { Copy, ExternalLink, Mail, Loader2, Package, AlertTriangle, RotateCcw, CheckCircle2, Circle, MapPin, Truck as TruckIcon, AlertOctagon, X, StickyNote } from "lucide-react"
+import type { EnrichedOrder, LaPosteTracking, Segment, ShippingStatus } from "@/lib/types"
 import {
   formatDateFR,
   getShipmentStatusLabel,
   getCountryFlag,
+  getShippingStatusConfig,
 } from "@/lib/shipping-utils"
 import { getSegmentColor, removeOrderFromSegment, setNote, getOrderNote, setOrderNote } from "@/lib/segments"
 import { useSupabase } from "@/lib/supabase/use-supabase"
@@ -30,24 +31,21 @@ import { cn } from "@/lib/utils"
 interface ShippingDetailPanelProps {
   order: EnrichedOrder | null
   tracking?: LaPosteTracking
+  effectiveStatus?: ShippingStatus
   open: boolean
   onClose: () => void
   segments?: Segment[]
   onSegmentsChange?: () => void
 }
 
-const alertBadge = {
-  delayed: { label: "RETARD", className: "bg-[#FEE8EB] text-[#C70A24] border-transparent" },
-  in_transit: { label: "En transit", className: "bg-[#FFF1E3] text-[#8A6116] border-transparent" },
-  delivered: { label: "Livré", className: "bg-[#CDFED4] text-[#047B5D] border-transparent" },
-}
-
-const laPosteStatusConfig = {
-  delivered: { label: "Livré", icon: CheckCircle2, className: "text-[#047B5D]", bg: "bg-[#CDFED4]" },
-  in_transit: { label: "En transit", icon: Package, className: "text-[#005BD3]", bg: "bg-[#EAF4FF]" },
-  problem: { label: "Problème en cours", icon: AlertTriangle, className: "text-[#E67C00]", bg: "bg-[#FFF1E3]" },
-  returned: { label: "Retour expéditeur", icon: RotateCcw, className: "text-[#007AFF]", bg: "bg-[#F3E8FF]" },
-  unknown: { label: "Statut inconnu", icon: Circle, className: "text-muted-foreground", bg: "bg-secondary" },
+const statusIconMap: Record<ShippingStatus, typeof CheckCircle2> = {
+  delivered: CheckCircle2,
+  pickup_ready: MapPin,
+  out_for_delivery: TruckIcon,
+  in_transit: Package,
+  delayed: AlertTriangle,
+  problem: AlertOctagon,
+  returned: RotateCcw,
 }
 
 function formatTrackingDate(dateStr: string): string {
@@ -217,6 +215,7 @@ function OrderNoteEditor({ orderId }: { orderId: string }) {
 export function ShippingDetailPanel({
   order,
   tracking,
+  effectiveStatus,
   open,
   onClose,
   segments = [],
@@ -224,7 +223,9 @@ export function ShippingDetailPanel({
 }: ShippingDetailPanelProps) {
   if (!order) return null
 
-  const badge = alertBadge[order.alertLevel]
+  const status = effectiveStatus ?? order.alertLevel
+  const statusConfig = getShippingStatusConfig(status)
+  const StatusIcon = statusIconMap[status] ?? Circle
   const orderSegments = segments.filter((s) => s.orderIds.includes(order.id))
 
   function copyEmail() {
@@ -234,10 +235,6 @@ export function ShippingDetailPanel({
 
   const shopifyNumericId = order.id.split("/").pop()
   const shopifyAdminUrl = `https://admin.shopify.com/store/grainedelascars/orders/${shopifyNumericId}`
-
-  const statusConfig = tracking
-    ? laPosteStatusConfig[tracking.statusSummary]
-    : null
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
@@ -256,8 +253,8 @@ export function ShippingDetailPanel({
                 <SheetTitle className="text-base">{order.customerName}</SheetTitle>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-sm text-muted-foreground">{order.orderName}</span>
-                  <Badge variant="outline" className={cn("text-[10px] font-medium", badge.className)}>
-                    {badge.label}
+                  <Badge variant="outline" className={cn("text-[10px] font-medium", statusConfig.badgeClassName)}>
+                    {statusConfig.label}
                   </Badge>
                 </div>
               </div>
@@ -398,17 +395,16 @@ export function ShippingDetailPanel({
               </div>
             ) : (
               <>
-                {statusConfig && (
-                  <div className={cn("flex items-center gap-3 rounded-lg p-4", statusConfig.bg)}>
-                    <statusConfig.icon className={cn("h-5 w-5", statusConfig.className)} />
-                    <div>
-                      <p className={cn("font-medium text-sm", statusConfig.className)}>{statusConfig.label}</p>
-                      {tracking.lastEventLabel && (
-                        <p className="text-xs text-muted-foreground mt-0.5">{tracking.lastEventLabel}</p>
-                      )}
-                    </div>
+                {/* Status banner */}
+                <div className={cn("flex items-center gap-3 rounded-lg p-4", statusConfig.iconBg)}>
+                  <StatusIcon className={cn("h-5 w-5", statusConfig.iconColor)} />
+                  <div>
+                    <p className={cn("font-medium text-sm", statusConfig.iconColor)}>{statusConfig.label}</p>
+                    {tracking.lastEventLabel && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{tracking.lastEventLabel}</p>
+                    )}
                   </div>
-                )}
+                </div>
 
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-mono">{order.trackingNumber}</p>

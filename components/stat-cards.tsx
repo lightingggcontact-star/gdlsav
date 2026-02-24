@@ -9,6 +9,7 @@ interface StatCardProps {
   total: number
   icon: LucideIcon
   color: "red" | "yellow" | "green" | "neutral" | "blue" | "orange"
+  subtitle?: string
 }
 
 const colorConfig = {
@@ -56,7 +57,7 @@ const colorConfig = {
   },
 }
 
-function StatCard({ label, value, total, icon: Icon, color }: StatCardProps) {
+function StatCard({ label, value, total, icon: Icon, color, subtitle }: StatCardProps) {
   const config = colorConfig[color]
   const pct = total > 0 ? Math.round((value / total) * 100) : 0
   const barWidth = total > 0 ? Math.max((value / total) * 100, 2) : 0
@@ -73,6 +74,9 @@ function StatCard({ label, value, total, icon: Icon, color }: StatCardProps) {
       </div>
       <p className={cn("text-2xl font-semibold", config.valueColor)}>{value}</p>
       <p className="text-[13px] text-muted-foreground mt-0.5">{label}</p>
+      {subtitle && (
+        <p className="text-[11px] text-muted-foreground/70 mt-0.5">{subtitle}</p>
+      )}
       {color !== "neutral" && (
         <div className={cn("mt-3 h-1 rounded-full", config.progressBg)}>
           <div
@@ -87,20 +91,45 @@ function StatCard({ label, value, total, icon: Icon, color }: StatCardProps) {
 
 // === Shipping Stats ===
 
+export interface ShippingStatsData {
+  total: number
+  delivered: number
+  pickup_ready: number
+  out_for_delivery: number
+  in_transit: number
+  delayed: number
+  problem: number
+  returned: number
+}
+
 interface ShippingStatsProps {
-  stats: {
-    total: number
-    delayed: number
-    inTransit: number
-    delivered: number
-  }
+  stats: ShippingStatsData
+}
+
+function buildSubtitle(parts: { count: number; label: string }[]): string {
+  return parts.filter((p) => p.count > 0).map((p) => `${p.count} ${p.label}`).join(", ")
 }
 
 export function ShippingStats({ stats }: ShippingStatsProps) {
+  const actionNeeded = stats.problem + stats.returned + stats.delayed
+  const inProgress = stats.in_transit + stats.out_for_delivery + stats.pickup_ready
+
+  const actionSubtitle = buildSubtitle([
+    { count: stats.problem, label: "probl." },
+    { count: stats.delayed, label: "retards" },
+    { count: stats.returned, label: "retours" },
+  ])
+
+  const progressSubtitle = buildSubtitle([
+    { count: stats.in_transit, label: "transit" },
+    { count: stats.out_for_delivery, label: "livraison" },
+    { count: stats.pickup_ready, label: "retrait" },
+  ])
+
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      <StatCard label="Problèmes / Retards" value={stats.delayed} total={stats.total} icon={AlertTriangle} color="red" />
-      <StatCard label="En transit" value={stats.inTransit} total={stats.total} icon={Truck} color="yellow" />
+      <StatCard label="A traiter" value={actionNeeded} total={stats.total} icon={AlertTriangle} color="red" subtitle={actionSubtitle} />
+      <StatCard label="En cours" value={inProgress} total={stats.total} icon={Truck} color="blue" subtitle={progressSubtitle} />
       <StatCard label="Livrés" value={stats.delivered} total={stats.total} icon={PackageCheck} color="green" />
       <StatCard label="Total" value={stats.total} total={stats.total} icon={BarChart3} color="neutral" />
     </div>

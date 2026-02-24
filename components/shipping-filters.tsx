@@ -10,8 +10,14 @@ import type { DateRange } from "react-day-picker"
 import type { Segment } from "@/lib/types"
 import { getSegmentColor, deleteSegment } from "@/lib/segments"
 import { useSupabase } from "@/lib/supabase/use-supabase"
+import type { ShippingStatsData } from "@/components/stat-cards"
 
-export type AlertFilter = "all" | "delayed" | "in_transit" | "delivered"
+export type AlertFilter =
+  | "all"
+  | "action_needed" | "delayed" | "problem" | "returned"
+  | "in_progress" | "in_transit" | "out_for_delivery" | "pickup_ready"
+  | "delivered"
+
 export type CountryFilter = "all" | "FR" | "BE"
 
 interface ShippingFiltersProps {
@@ -19,7 +25,7 @@ interface ShippingFiltersProps {
   countryFilter: CountryFilter
   searchQuery: string
   dateRange: DateRange | undefined
-  counts?: { delayed: number; inTransit: number; delivered: number; total: number }
+  counts?: ShippingStatsData
   segments?: Segment[]
   segmentFilter?: string
   onAlertFilterChange: (filter: AlertFilter) => void
@@ -30,18 +36,64 @@ interface ShippingFiltersProps {
   onSegmentsChange?: () => void
 }
 
-const alertOptions: { value: AlertFilter; label: string; countKey?: keyof NonNullable<ShippingFiltersProps["counts"]> }[] = [
-  { value: "all", label: "Tous", countKey: "total" },
-  { value: "delayed", label: "Problèmes", countKey: "delayed" },
-  { value: "in_transit", label: "En transit", countKey: "inTransit" },
-  { value: "delivered", label: "Livrés", countKey: "delivered" },
+// Main filter options (top level)
+const mainOptions: { value: AlertFilter; label: string }[] = [
+  { value: "all", label: "Tous" },
+  { value: "action_needed", label: "A traiter" },
+  { value: "in_progress", label: "En cours" },
+  { value: "delivered", label: "Livrés" },
 ]
+
+// Sub-filter chips for "A traiter" group
+const actionSubFilters: { value: AlertFilter; label: string }[] = [
+  { value: "problem", label: "Problèmes" },
+  { value: "delayed", label: "Retards" },
+  { value: "returned", label: "Retournés" },
+]
+
+// Sub-filter chips for "En cours" group
+const progressSubFilters: { value: AlertFilter; label: string }[] = [
+  { value: "in_transit", label: "En transit" },
+  { value: "out_for_delivery", label: "En livraison" },
+  { value: "pickup_ready", label: "Dispo retrait" },
+]
+
+function getMainCount(value: AlertFilter, counts?: ShippingStatsData): number | undefined {
+  if (!counts) return undefined
+  switch (value) {
+    case "all": return counts.total
+    case "action_needed": return counts.problem + counts.returned + counts.delayed
+    case "in_progress": return counts.in_transit + counts.out_for_delivery + counts.pickup_ready
+    case "delivered": return counts.delivered
+    default: return undefined
+  }
+}
+
+function getSubCount(value: AlertFilter, counts?: ShippingStatsData): number | undefined {
+  if (!counts) return undefined
+  switch (value) {
+    case "problem": return counts.problem
+    case "delayed": return counts.delayed
+    case "returned": return counts.returned
+    case "in_transit": return counts.in_transit
+    case "out_for_delivery": return counts.out_for_delivery
+    case "pickup_ready": return counts.pickup_ready
+    default: return undefined
+  }
+}
 
 const countryOptions: { value: CountryFilter; label: string }[] = [
   { value: "all", label: "Tous pays" },
   { value: "FR", label: "France" },
   { value: "BE", label: "Belgique" },
 ]
+
+// Determine which main group a filter belongs to
+function getActiveGroup(filter: AlertFilter): "action_needed" | "in_progress" | null {
+  if (filter === "action_needed" || filter === "problem" || filter === "delayed" || filter === "returned") return "action_needed"
+  if (filter === "in_progress" || filter === "in_transit" || filter === "out_for_delivery" || filter === "pickup_ready") return "in_progress"
+  return null
+}
 
 export function ShippingFilters({
   alertFilter,
@@ -62,21 +114,55 @@ export function ShippingFilters({
   const [segmentDropdownOpen, setSegmentDropdownOpen] = useState(false)
 
   const activeSegment = segments.find((s) => s.id === segmentFilter)
+  const activeGroup = getActiveGroup(alertFilter)
+
+  // Determine which main button is "active"
+  function isMainActive(value: AlertFilter): boolean {
+    if (value === alertFilter) return true
+    if (value === "action_needed" && activeGroup === "action_needed") return true
+    if (value === "in_progress" && activeGroup === "in_progress") return true
+    return false
+  }
+
+  function handleMainClick(value: AlertFilter) {
+    if (value === "action_needed") {
+      // If already in action group, toggle back to all
+      if (activeGroup === "action_needed") {
+        onAlertFilterChange("all")
+      } else {
+        onAlertFilterChange("action_needed")
+      }
+    } else if (value === "in_progress") {
+      if (activeGroup === "in_progress") {
+        onAlertFilterChange("all")
+      } else {
+        onAlertFilterChange("in_progress")
+      }
+    } else {
+      onAlertFilterChange(value)
+    }
+  }
+
+  // Show sub-filters when a group is active
+  const showActionSub = activeGroup === "action_needed"
+  const showProgressSub = activeGroup === "in_progress"
+  const subFilters = showActionSub ? actionSubFilters : showProgressSub ? progressSubFilters : null
+  const parentFilter: AlertFilter | null = showActionSub ? "action_needed" : showProgressSub ? "in_progress" : null
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center flex-wrap">
         {/* Alert filter */}
         <div className="flex border border-border rounded-lg overflow-hidden bg-card">
-          {alertOptions.map((opt) => {
-            const count = opt.countKey && counts ? counts[opt.countKey] : undefined
+          {mainOptions.map((opt) => {
+            const count = getMainCount(opt.value, counts)
             return (
               <button
                 key={opt.value}
-                onClick={() => onAlertFilterChange(opt.value)}
+                onClick={() => handleMainClick(opt.value)}
                 className={cn(
                   "h-8 px-3 text-[13px] font-medium transition-colors border-r border-border last:border-r-0",
-                  alertFilter === opt.value
+                  isMainActive(opt.value)
                     ? "bg-secondary text-foreground"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                 )}
@@ -198,6 +284,36 @@ export function ShippingFilters({
           onDateRangeChange={onDateRangeChange}
         />
       </div>
+
+      {/* Sub-filters (expanded when a group is active) */}
+      {subFilters && parentFilter && (
+        <div className="flex gap-1.5 flex-wrap">
+          {subFilters.map((sub) => {
+            const count = getSubCount(sub.value, counts)
+            const isActive = alertFilter === sub.value
+            return (
+              <button
+                key={sub.value}
+                onClick={() => {
+                  // Toggle: if already active, go back to parent group
+                  onAlertFilterChange(isActive ? parentFilter : sub.value)
+                }}
+                className={cn(
+                  "h-7 px-2.5 text-[12px] font-medium rounded-md transition-colors",
+                  isActive
+                    ? "bg-foreground text-background"
+                    : "bg-secondary text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {sub.label}
+                {count !== undefined && count > 0 && (
+                  <span className={cn("ml-1 text-[10px]", isActive ? "opacity-70" : "text-muted-foreground/60")}>{count}</span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative sm:max-w-sm">

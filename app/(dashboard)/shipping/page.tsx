@@ -5,7 +5,7 @@ import { RefreshCw } from "lucide-react"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ShippingStats } from "@/components/stat-cards"
+import { ShippingStats, type ShippingStatsData } from "@/components/stat-cards"
 import {
   ShippingFilters,
   type AlertFilter,
@@ -15,21 +15,22 @@ import { ShippingTable } from "@/components/shipping-table"
 import { ShippingDetailPanel } from "@/components/shipping-detail-panel"
 import { SegmentActionBar } from "@/components/segment-action-bar"
 import { CreateSegmentDialog } from "@/components/create-segment-dialog"
-import type { EnrichedOrder, LaPosteTracking, Segment } from "@/lib/types"
+import type { EnrichedOrder, LaPosteTracking, Segment, ShippingStatus, ShippingThresholds } from "@/lib/types"
+import { DEFAULT_THRESHOLDS } from "@/lib/types"
+import { deriveShippingStatus } from "@/lib/shipping-utils"
 import { getSegments, getOrderNotes } from "@/lib/segments"
 import { useSupabase } from "@/lib/supabase/use-supabase"
 import type { DateRange } from "react-day-picker"
 
 interface ShippingResponse {
   orders: EnrichedOrder[]
-  stats: {
-    total: number
-    delayed: number
-    inTransit: number
-    delivered: number
-  }
+  stats: ShippingStatsData
   fetchedAt: string
 }
+
+// Which statuses belong to which group filter
+const ACTION_STATUSES: Set<ShippingStatus> = new Set(["problem", "returned", "delayed"])
+const PROGRESS_STATUSES: Set<ShippingStatus> = new Set(["in_transit", "out_for_delivery", "pickup_ready"])
 
 export default function ShippingPage() {
   const supabase = useSupabase()
@@ -37,6 +38,9 @@ export default function ShippingPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+
+  // Thresholds
+  const [thresholds, setThresholds] = useState<ShippingThresholds>(DEFAULT_THRESHOLDS)
 
   // Filters
   const [alertFilter, setAlertFilter] = useState<AlertFilter>("all")
@@ -78,10 +82,14 @@ export default function ShippingPage() {
         .select("threshold_fr, threshold_be")
         .single()
 
-      const thresholdFR = String(settings?.threshold_fr ?? 3)
-      const thresholdBE = String(settings?.threshold_be ?? 5)
+      const thFR = settings?.threshold_fr ?? DEFAULT_THRESHOLDS.fr
+      const thBE = settings?.threshold_be ?? DEFAULT_THRESHOLDS.be
+      setThresholds({ fr: thFR, be: thBE })
 
-      const params = new URLSearchParams({ thresholdFR, thresholdBE })
+      const params = new URLSearchParams({
+        thresholdFR: String(thFR),
+        thresholdBE: String(thBE),
+      })
       if (force) params.set("force", "true")
 
       if (range?.from) {
@@ -116,7 +124,7 @@ export default function ShippingPage() {
     }
   }, [supabase])
 
-  const fetchAllTracking = useCallback(async (orders: EnrichedOrder[]) => {
+  const fetchAllTracking = useCallback(async (orders: EnrichedOrder[], force = false) => {
     const trackingNumbers = orders
       .filter((o) => o.trackingNumber)
       .map((o) => o.trackingNumber!)
@@ -129,7 +137,7 @@ export default function ShippingPage() {
       const res = await fetch("/api/tracking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ numbers: trackingNumbers }),
+        body: JSON.stringify({ numbers: trackingNumbers, force }),
       })
       if (res.ok) {
         const json = await res.json()
@@ -179,7 +187,7 @@ export default function ShippingPage() {
     const result = await fetchData(dateRange, true)
     setRefreshing(false)
     if (result?.orders) {
-      fetchAllTracking(result.orders)
+      fetchAllTracking(result.orders, true)
     }
   }
 
@@ -194,28 +202,42 @@ export default function ShippingPage() {
     }
   }
 
-  // Derive effective status: La Poste when available, fallback to Shopify
-  const getEffectiveStatus = useCallback((order: EnrichedOrder): "delayed" | "in_transit" | "delivered" => {
+  // Derive effective status: La Poste when available, fallback to enriched
+  const getEffectiveStatus = useCallback((order: EnrichedOrder): ShippingStatus => {
     const lp = order.trackingNumber ? trackingMap[order.trackingNumber] : undefined
     if (lp && lp.statusSummary !== "unknown") {
-      if (lp.statusSummary === "delivered") return "delivered"
-      if (lp.statusSummary === "problem" || lp.statusSummary === "returned") return "delayed"
-      return "in_transit"
+      return deriveShippingStatus(
+        lp.statusSummary,
+        order.shipmentStatus,
+        order.businessDaysElapsed,
+        order.countryCode,
+        thresholds
+      )
     }
     return order.alertLevel
-  }, [trackingMap])
+  }, [trackingMap, thresholds])
+
+  // Filter logic supporting group and individual filters
+  function matchesAlertFilter(status: ShippingStatus, filter: AlertFilter): boolean {
+    if (filter === "all") return true
+    if (filter === "action_needed") return ACTION_STATUSES.has(status)
+    if (filter === "in_progress") return PROGRESS_STATUSES.has(status)
+    if (filter === "delivered") return status === "delivered"
+    // Individual sub-filters
+    return status === filter
+  }
 
   // Filtered orders
   const filteredOrders = useMemo(() => {
     if (!data) return []
 
-    // Segment filter: get order IDs in selected segment
     const segOrderIds = segmentFilter !== "all"
       ? new Set(segments.find((s) => s.id === segmentFilter)?.orderIds ?? [])
       : null
 
     return data.orders.filter((order) => {
-      if (alertFilter !== "all" && getEffectiveStatus(order) !== alertFilter) return false
+      const effectiveStatus = getEffectiveStatus(order)
+      if (!matchesAlertFilter(effectiveStatus, alertFilter)) return false
       if (countryFilter !== "all" && order.countryCode !== countryFilter) return false
       if (segOrderIds && !segOrderIds.has(order.id)) return false
 
@@ -232,27 +254,27 @@ export default function ShippingPage() {
     })
   }, [data, alertFilter, countryFilter, searchQuery, segmentFilter, segments, getEffectiveStatus])
 
-  // Filtered stats — use La Poste status when available, fallback to Shopify alertLevel
-  const filteredStats = useMemo(() => {
-    let delayed = 0
-    let inTransit = 0
-    let delivered = 0
-
-    for (const o of filteredOrders) {
-      const lp = o.trackingNumber ? trackingMap[o.trackingNumber] : undefined
-      if (lp && lp.statusSummary !== "unknown") {
-        if (lp.statusSummary === "delivered") delivered++
-        else if (lp.statusSummary === "problem" || lp.statusSummary === "returned") delayed++
-        else inTransit++
-      } else {
-        if (o.alertLevel === "delivered") delivered++
-        else if (o.alertLevel === "delayed") delayed++
-        else inTransit++
-      }
+  // Filtered stats — count all 7 statuses using effective (La Poste merged) status
+  const filteredStats = useMemo((): ShippingStatsData => {
+    const counts: ShippingStatsData = {
+      total: 0,
+      delivered: 0,
+      pickup_ready: 0,
+      out_for_delivery: 0,
+      in_transit: 0,
+      delayed: 0,
+      problem: 0,
+      returned: 0,
     }
 
-    return { total: filteredOrders.length, delayed, inTransit, delivered }
-  }, [filteredOrders, trackingMap])
+    for (const o of filteredOrders) {
+      const status = getEffectiveStatus(o)
+      counts[status]++
+      counts.total++
+    }
+
+    return counts
+  }, [filteredOrders, getEffectiveStatus])
 
   if (loading) {
     return (
@@ -359,12 +381,14 @@ export default function ShippingPage() {
         onSelectionChange={setSelectedIds}
         segments={segments}
         orderNotes={orderNotes}
+        thresholds={thresholds}
       />
 
       {/* Detail panel */}
       <ShippingDetailPanel
         order={selectedOrder}
         tracking={selectedOrder?.trackingNumber ? trackingMap[selectedOrder.trackingNumber] : undefined}
+        effectiveStatus={selectedOrder ? getEffectiveStatus(selectedOrder) : undefined}
         open={!!selectedOrder}
         onClose={() => setSelectedOrder(null)}
         segments={segments}
