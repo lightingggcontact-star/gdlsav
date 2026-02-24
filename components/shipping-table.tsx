@@ -393,15 +393,15 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
                   </TableCell>
 
                   {/* Statut + La Poste last event */}
-                  <TableCell>
-                    <div className="space-y-0.5">
-                      <Badge variant="outline" className={cn("text-[10px] font-medium", statusConfig.badgeClassName)}>
+                  <TableCell className="min-w-50">
+                    <div className="flex items-start gap-2">
+                      <Badge variant="outline" className={cn("text-[10px] font-medium shrink-0 mt-0.5", statusConfig.badgeClassName)}>
                         {statusConfig.label}
                       </Badge>
                       {tracking?.lastEventLabel && (
-                        <p className="text-[10px] text-muted-foreground/70 truncate max-w-36">
+                        <span className="text-[11px] text-muted-foreground leading-tight">
                           {tracking.lastEventLabel}
-                        </p>
+                        </span>
                       )}
                     </div>
                   </TableCell>
