@@ -15,6 +15,7 @@ import {
   RotateCcw,
   Lightbulb,
   Gamepad2,
+  Video,
 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
@@ -27,7 +28,8 @@ const NAV_ITEMS = [
   { href: "/forms", label: "Formulaires", icon: FileText },
   { href: "/google-fiches", label: "Google Fiches", icon: MapPin },
   { href: "/insights", label: "Insights", icon: Lightbulb },
-  { href: "/jeu", label: "Jeu Fidélisation", icon: Gamepad2, separator: true },
+  { href: "/videos", label: "Video Stories", icon: Video, separator: true },
+  { href: "/jeu", label: "Jeu Fidélisation", icon: Gamepad2 },
   { href: "/settings", label: "Paramètres", icon: Settings },
 ]
 

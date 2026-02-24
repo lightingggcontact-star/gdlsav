@@ -650,3 +650,63 @@ export async function fetchCustomersByPhones(
 
   return result
 }
+
+// ─── Search products by title ───
+
+const SEARCH_PRODUCTS_QUERY = `
+  query SearchProducts($query: String!) {
+    products(first: 20, query: $query) {
+      edges {
+        node {
+          id
+          title
+          handle
+          featuredImage {
+            url
+          }
+          status
+        }
+      }
+    }
+  }
+`
+
+export interface ShopifyProductResult {
+  id: string
+  numericId: string
+  title: string
+  handle: string
+  imageUrl: string | null
+}
+
+export async function searchProducts(query: string): Promise<ShopifyProductResult[]> {
+  const trimmed = query.trim()
+  if (!trimmed) return []
+
+  const shopifyQuery = `title:*${trimmed}* status:active`
+
+  const response = await shopifyGraphQL(SEARCH_PRODUCTS_QUERY, {
+    query: shopifyQuery,
+  })
+
+  if (response.errors?.length) {
+    throw new Error(
+      `Shopify GraphQL errors: ${response.errors.map((e) => e.message).join(", ")}`
+    )
+  }
+
+  const edges = (response.data as any)?.products?.edges ?? []
+
+  return edges.map((edge: any) => {
+    const node = edge.node
+    const gid = node.id as string
+    const numericId = gid.split("/").pop() ?? gid
+    return {
+      id: gid,
+      numericId,
+      title: node.title,
+      handle: node.handle,
+      imageUrl: node.featuredImage?.url ?? null,
+    }
+  })
+}

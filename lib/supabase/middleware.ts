@@ -36,6 +36,7 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith("/play") &&
     !request.nextUrl.pathname.startsWith("/api/game/verify") &&
     !request.nextUrl.pathname.startsWith("/api/game/play") &&
+    !request.nextUrl.pathname.startsWith("/api/videos/") &&
     !request.nextUrl.pathname.startsWith("/_next") &&
     !request.nextUrl.pathname.startsWith("/favicon")
   ) {

@@ -179,3 +179,33 @@ export interface InsightsCacheRow {
   generated_at: string
 }
 
+// === Video Stories ===
+
+export interface StoryVideo {
+  id: string
+  name: string
+  emoji: string
+  video_url: string
+  thumbnail_url: string | null
+  display_order: number
+  created_at: string
+  stories_video_products: StoryVideoProduct[]
+}
+
+export interface StoryVideoProduct {
+  id: string
+  shopify_product_id: string
+  shopify_product_title: string | null
+  display_order: number
+}
+
+export interface StoriesSettings {
+  id: string
+  enabled: boolean
+  circle_size: number
+  border_color: string
+  border_style: string
+  position: string
+  updated_at: string
+}
+
