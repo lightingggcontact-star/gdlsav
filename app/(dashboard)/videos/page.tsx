@@ -22,6 +22,7 @@ interface ProductTag {
   id: string
   title: string
   status?: string
+  imageUrl?: string | null
 }
 
 // ─── Product Search Input ───
@@ -68,7 +69,7 @@ function ProductSearchInput({
         const res = await fetch(`/api/shopify/search-products?q=${encodeURIComponent(query)}`)
         const data = await res.json()
         setResults(
-          (data.products ?? []).map((p: any) => ({ id: p.numericId, title: p.title, status: p.status }))
+          (data.products ?? []).map((p: any) => ({ id: p.numericId, title: p.title, status: p.status, imageUrl: p.imageUrl }))
         )
         setOpen(true)
       } catch {
@@ -108,6 +109,7 @@ function ProductSearchInput({
         id: p.numericId,
         title: p.title,
         status: p.status,
+        imageUrl: p.imageUrl,
       }))
       onBulkAdd(products)
     } catch {
@@ -127,6 +129,7 @@ function ProductSearchInput({
         id: p.numericId,
         title: p.title,
         status: p.status,
+        imageUrl: p.imageUrl,
       }))
       onBulkAdd(products)
     } catch {
@@ -163,12 +166,25 @@ function ProductSearchInput({
                       setQuery("")
                       setOpen(false)
                     }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] hover:bg-secondary transition-colors"
+                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-secondary transition-colors"
                   >
-                    <span className="flex-1">{p.title}</span>
-                    {p.status && p.status !== "active" && (
+                    <div className="h-8 w-8 shrink-0 overflow-hidden rounded-md bg-secondary">
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                          <Video className="h-3.5 w-3.5" />
+                        </div>
+                      )}
+                    </div>
+                    <span className="flex-1 text-[13px] truncate">{p.title}</span>
+                    {p.status && p.status !== "active" ? (
                       <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-700">
                         Non répertorié
+                      </span>
+                    ) : (
+                      <span className="shrink-0 rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700">
+                        Actif
                       </span>
                     )}
                   </button>
@@ -209,27 +225,38 @@ function ProductSearchInput({
         </div>
       </div>
       {selected.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {selected.map((p) => (
-            <span
-              key={p.id}
-              className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium"
-            >
-              {p.title}
-              {p.status && p.status !== "active" && (
-                <span className="rounded bg-amber-100 px-1 text-[9px] text-amber-700">NR</span>
-              )}
-              <button onClick={() => onRemove(p.id)} className="text-muted-foreground hover:text-foreground">
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-1.5">
+            {selected.map((p) => (
+              <span
+                key={p.id}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-secondary pl-1 pr-2 py-1 text-[11px] font-medium"
+              >
+                <div className="h-5 w-5 shrink-0 overflow-hidden rounded-[4px] bg-background">
+                  {p.imageUrl ? (
+                    <img src={p.imageUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                      <Video className="h-3 w-3" />
+                    </div>
+                  )}
+                </div>
+                <span className="max-w-[120px] truncate">{p.title}</span>
+                {p.status && p.status !== "active" && (
+                  <span className="rounded bg-amber-100 px-1 text-[9px] text-amber-700">NR</span>
+                )}
+                <button onClick={() => onRemove(p.id)} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
           {selected.length > 1 && (
             <button
               onClick={() => selected.forEach((p) => onRemove(p.id))}
               className="text-[10px] text-muted-foreground hover:text-[#E51C00] transition-colors"
             >
-              Tout retirer
+              Tout retirer ({selected.length})
             </button>
           )}
         </div>
@@ -765,48 +792,54 @@ export default function VideosPage() {
 
       {/* Edit Dialog */}
       {dialogOpen && editingVideo && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40" onClick={() => resetDialog()}>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4" onClick={() => resetDialog()}>
           <div
-            className="flex w-full max-w-md flex-col rounded-t-xl sm:rounded-lg border border-border bg-card shadow-xl max-h-[90vh]"
+            className="flex w-full sm:max-w-lg flex-col rounded-t-2xl sm:rounded-xl border border-border bg-card shadow-xl max-h-[92vh] sm:max-h-[85vh]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header fixe */}
-            <div className="flex items-center justify-between border-b border-border px-6 py-4 shrink-0">
+            <div className="flex items-center justify-between border-b border-border px-5 py-3.5 shrink-0">
               <h3 className="text-[15px] font-semibold text-foreground">Modifier la vidéo</h3>
-              <button onClick={resetDialog} className="text-muted-foreground hover:text-foreground">
+              <button onClick={resetDialog} className="rounded-lg p-1 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             {/* Contenu scrollable */}
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-              {/* Preview thumbnail */}
-              {editPreview && (
-                <div className="flex items-center gap-3">
-                  <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border-2 border-purple-500 bg-secondary">
+            <div className="flex-1 overflow-y-auto overscroll-contain">
+              {/* Preview vidéo + nom */}
+              <div className="flex items-start gap-4 border-b border-border px-5 py-4">
+                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 border-purple-500/60 bg-secondary shadow-sm">
+                  {editPreview ? (
                     <img src={editPreview} className="h-full w-full object-cover" alt="preview" />
-                  </div>
-                  <span className="text-[11px] text-muted-foreground">Thumbnail actuelle</span>
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <Video className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                  )}
                 </div>
-              )}
-
-              {/* Nom */}
-              <div>
-                <label className="mb-1 block text-[12px] font-medium text-foreground">Nom</label>
-                <input
-                  type="text"
-                  value={uploadName}
-                  onChange={(e) => setUploadName(e.target.value)}
-                  placeholder="Ex: Amnésia Hydro"
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[13px] outline-none focus:border-[#007AFF]"
-                />
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Nom d&apos;affichage</label>
+                  <input
+                    type="text"
+                    value={uploadName}
+                    onChange={(e) => setUploadName(e.target.value)}
+                    placeholder="Ex: Amnésia Hydro"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[14px] font-medium outline-none focus:border-[#007AFF] transition-colors"
+                  />
+                </div>
               </div>
 
-              {/* Produits */}
-              <div>
-                <label className="mb-1 block text-[12px] font-medium text-foreground">
-                  Produits associés ({uploadProducts.length})
-                </label>
+              {/* Produits associés */}
+              <div className="px-5 py-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                    Produits associés
+                  </label>
+                  <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                    {uploadProducts.length}
+                  </span>
+                </div>
                 <ProductSearchInput
                   selected={uploadProducts}
                   onAdd={(p) => setUploadProducts((prev) => [...prev, p])}
@@ -822,7 +855,7 @@ export default function VideosPage() {
             </div>
 
             {/* Boutons sticky en bas */}
-            <div className="flex justify-end gap-2 border-t border-border px-6 py-4 shrink-0">
+            <div className="flex items-center justify-between border-t border-border px-5 py-3.5 shrink-0 bg-card">
               <button
                 onClick={resetDialog}
                 className="rounded-lg px-4 py-2 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors"
@@ -832,7 +865,7 @@ export default function VideosPage() {
               <button
                 onClick={handleEditSave}
                 disabled={uploading || !uploadName}
-                className="flex items-center gap-2 rounded-lg bg-[#007AFF] px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[#0066DD] disabled:opacity-50"
+                className="flex items-center gap-2 rounded-lg bg-[#007AFF] px-5 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-[#0066DD] disabled:opacity-50"
               >
                 {uploading && <Loader2 className="h-4 w-4 animate-spin" />}
                 {uploading ? "Sauvegarde..." : "Sauvegarder"}
