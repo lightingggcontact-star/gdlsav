@@ -191,15 +191,20 @@ export default function VideosPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingVideo, setEditingVideo] = useState<StoryVideo | null>(null)
 
-  // Upload state
+  // Batch upload state
+  const [batchFiles, setBatchFiles] = useState<File[]>([])
+  const [batchUploading, setBatchUploading] = useState(false)
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Edit state (single video)
   const [uploading, setUploading] = useState(false)
   const [uploadName, setUploadName] = useState("")
   const [uploadEmoji, setUploadEmoji] = useState("🎬")
-  const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadProducts, setUploadProducts] = useState<ProductTag[]>([])
-  const [uploadPreview, setUploadPreview] = useState<string | null>(null)
-  const [dragOver, setDragOver] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [editFile, setEditFile] = useState<File | null>(null)
+  const [editPreview, setEditPreview] = useState<string | null>(null)
 
   const fetchVideos = useCallback(async () => {
     try {
@@ -222,49 +227,115 @@ export default function VideosPage() {
   function resetDialog() {
     setUploadName("")
     setUploadEmoji("🎬")
-    setUploadFile(null)
     setUploadProducts([])
-    setUploadPreview(null)
+    setEditFile(null)
+    setEditPreview(null)
     setEditingVideo(null)
+    setBatchFiles([])
+    setBatchProgress(null)
     setDialogOpen(false)
   }
 
-  function handleFileSelect(file: File) {
-    if (file.size > 50 * 1024 * 1024) {
-      alert("Fichier trop lourd (max 50 MB)")
-      return
+  function handleFilesSelect(files: FileList | File[]) {
+    const valid: File[] = []
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith("video/")) continue
+      if (file.size > 50 * 1024 * 1024) continue
+      valid.push(file)
     }
-    setUploadFile(file)
-    setUploadPreview(URL.createObjectURL(file))
-    if (!uploadName) {
-      setUploadName(file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "))
-    }
+    if (valid.length === 0) return
+    setBatchFiles((prev) => [...prev, ...valid])
+    if (!dialogOpen) setDialogOpen(true)
   }
 
-  async function handleUpload() {
-    if (!uploadFile && !editingVideo) return
+  function removeBatchFile(index: number) {
+    setBatchFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  async function uploadSingleFile(file: File) {
+    const ts = Date.now()
+    const safeName = file.name.replace(/[^\w.-]/g, "_")
+    const videoPath = `videos/${ts}-${safeName}`
+
+    const { error: uploadErr } = await supabase.storage
+      .from("stories")
+      .upload(videoPath, file, { cacheControl: "3600", contentType: file.type })
+    if (uploadErr) throw uploadErr
+
+    const { data: urlData } = supabase.storage.from("stories").getPublicUrl(videoPath)
+    const videoUrl = urlData.publicUrl
+
+    let thumbnailUrl = ""
+    try {
+      const thumbBlob = await generateThumbnail(file)
+      const thumbPath = `thumbnails/${ts}-thumb.jpg`
+      await supabase.storage
+        .from("stories")
+        .upload(thumbPath, thumbBlob, { cacheControl: "3600", contentType: "image/jpeg" })
+      const { data: thumbUrlData } = supabase.storage.from("stories").getPublicUrl(thumbPath)
+      thumbnailUrl = thumbUrlData.publicUrl
+    } catch {
+      // Pas grave si thumbnail echoue
+    }
+
+    const name = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ")
+
+    await fetch("/api/stories/videos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        emoji: "🎬",
+        video_url: videoUrl,
+        thumbnail_url: thumbnailUrl,
+        products: [],
+      }),
+    })
+  }
+
+  async function handleBatchUpload() {
+    if (batchFiles.length === 0) return
+    setBatchUploading(true)
+    setBatchProgress({ current: 0, total: batchFiles.length })
+
+    let errors = 0
+    for (let i = 0; i < batchFiles.length; i++) {
+      setBatchProgress({ current: i + 1, total: batchFiles.length })
+      try {
+        await uploadSingleFile(batchFiles[i])
+      } catch {
+        errors++
+      }
+    }
+
+    setBatchUploading(false)
+    if (errors > 0) alert(`${errors} vidéo(s) n'ont pas pu être uploadée(s)`)
+    resetDialog()
+    fetchVideos()
+  }
+
+  async function handleEditSave() {
+    if (!editingVideo) return
     setUploading(true)
 
     try {
-      let videoUrl = editingVideo?.video_url ?? ""
-      let thumbnailUrl = editingVideo?.thumbnail_url ?? ""
+      let videoUrl = editingVideo.video_url
+      let thumbnailUrl = editingVideo.thumbnail_url ?? ""
 
-      // Upload nouveau fichier si fourni
-      if (uploadFile) {
+      if (editFile) {
         const ts = Date.now()
-        const safeName = uploadFile.name.replace(/[^\w.-]/g, '_')
+        const safeName = editFile.name.replace(/[^\w.-]/g, "_")
         const videoPath = `videos/${ts}-${safeName}`
         const { error: uploadErr } = await supabase.storage
           .from("stories")
-          .upload(videoPath, uploadFile, { cacheControl: "3600", contentType: uploadFile.type })
+          .upload(videoPath, editFile, { cacheControl: "3600", contentType: editFile.type })
         if (uploadErr) throw uploadErr
 
         const { data: urlData } = supabase.storage.from("stories").getPublicUrl(videoPath)
         videoUrl = urlData.publicUrl
 
-        // Generer thumbnail
         try {
-          const thumbBlob = await generateThumbnail(uploadFile)
+          const thumbBlob = await generateThumbnail(editFile)
           const thumbPath = `thumbnails/${ts}-thumb.jpg`
           await supabase.storage
             .from("stories")
@@ -272,36 +343,26 @@ export default function VideosPage() {
           const { data: thumbUrlData } = supabase.storage.from("stories").getPublicUrl(thumbPath)
           thumbnailUrl = thumbUrlData.publicUrl
         } catch {
-          // Pas grave si thumbnail echoue
+          // Pas grave
         }
       }
 
-      const payload = {
-        name: uploadName,
-        emoji: uploadEmoji,
-        video_url: videoUrl,
-        thumbnail_url: thumbnailUrl,
-        products: uploadProducts.map((p) => ({ id: p.id, title: p.title })),
-      }
-
-      if (editingVideo) {
-        await fetch(`/api/stories/videos/${editingVideo.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        })
-      } else {
-        await fetch("/api/stories/videos", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        })
-      }
+      await fetch(`/api/stories/videos/${editingVideo.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: uploadName,
+          emoji: uploadEmoji,
+          video_url: videoUrl,
+          thumbnail_url: thumbnailUrl,
+          products: uploadProducts.map((p) => ({ id: p.id, title: p.title })),
+        }),
+      })
 
       resetDialog()
       fetchVideos()
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Erreur upload")
+      alert(err instanceof Error ? err.message : "Erreur sauvegarde")
     } finally {
       setUploading(false)
     }
@@ -317,14 +378,15 @@ export default function VideosPage() {
     setEditingVideo(video)
     setUploadName(video.name)
     setUploadEmoji(video.emoji)
-    setUploadFile(null)
-    setUploadPreview(video.thumbnail_url)
+    setEditFile(null)
+    setEditPreview(video.thumbnail_url)
     setUploadProducts(
       video.stories_video_products.map((p) => ({
         id: p.shopify_product_id,
         title: p.shopify_product_title ?? p.shopify_product_id,
       }))
     )
+    setBatchFiles([])
     setDialogOpen(true)
   }
 
@@ -454,76 +516,157 @@ export default function VideosPage() {
         </Reorder.Group>
       )}
 
-      {/* Upload/Edit Dialog */}
-      {dialogOpen && (
+      {/* Batch Upload Dialog */}
+      {dialogOpen && !editingVideo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !batchUploading && resetDialog()}>
+          <div
+            className="w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-[15px] font-semibold text-foreground">
+                Ajouter des vidéos
+              </h3>
+              {!batchUploading && (
+                <button onClick={resetDialog} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              {/* Drop zone */}
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setDragOver(false)
+                  handleFilesSelect(e.dataTransfer.files)
+                }}
+                onClick={() => !batchUploading && fileInputRef.current?.click()}
+                className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed p-6 transition-colors ${
+                  dragOver ? "border-[#007AFF] bg-[#EAF3FF]" : "border-border hover:border-[#007AFF]/50"
+                } ${batchUploading ? "pointer-events-none opacity-50" : ""}`}
+              >
+                <Upload className="h-6 w-6 text-muted-foreground" />
+                <p className="text-[12px] text-muted-foreground">
+                  Glisse tes vidéos ici ou clique pour parcourir
+                </p>
+                <p className="text-[10px] text-muted-foreground">Plusieurs fichiers possibles · Max 50 MB / vidéo</p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="video/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files) handleFilesSelect(e.target.files)
+                    e.target.value = ""
+                  }}
+                />
+              </div>
+
+              {/* File list */}
+              {batchFiles.length > 0 && (
+                <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                  {batchFiles.map((file, i) => (
+                    <div
+                      key={`${file.name}-${i}`}
+                      className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2"
+                    >
+                      <Video className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-medium truncate">
+                          {file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ")}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {(file.size / (1024 * 1024)).toFixed(1)} MB
+                        </p>
+                      </div>
+                      {batchProgress && batchProgress.current > i ? (
+                        <span className="text-[11px] text-green-600 font-medium">✓</span>
+                      ) : batchProgress && batchProgress.current === i ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-[#007AFF]" />
+                      ) : !batchUploading ? (
+                        <button
+                          onClick={() => removeBatchFile(i)}
+                          className="text-muted-foreground hover:text-[#E51C00] transition-colors"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Progress bar */}
+              {batchProgress && (
+                <div className="space-y-1">
+                  <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                    <div
+                      className="h-full bg-[#007AFF] transition-all duration-300 rounded-full"
+                      style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground text-center">
+                    {batchProgress.current} / {batchProgress.total} vidéo{batchProgress.total > 1 ? "s" : ""}
+                  </p>
+                </div>
+              )}
+
+              {/* Boutons */}
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-[12px] text-muted-foreground">
+                  {batchFiles.length} vidéo{batchFiles.length > 1 ? "s" : ""} sélectionnée{batchFiles.length > 1 ? "s" : ""}
+                </p>
+                <div className="flex gap-2">
+                  {!batchUploading && (
+                    <button
+                      onClick={resetDialog}
+                      className="rounded-lg px-4 py-2 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Annuler
+                    </button>
+                  )}
+                  <button
+                    onClick={handleBatchUpload}
+                    disabled={batchUploading || batchFiles.length === 0}
+                    className="flex items-center gap-2 rounded-lg bg-[#007AFF] px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[#0066DD] disabled:opacity-50"
+                  >
+                    {batchUploading && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {batchUploading ? "Upload en cours..." : `Uploader ${batchFiles.length > 0 ? `(${batchFiles.length})` : ""}`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Dialog */}
+      {dialogOpen && editingVideo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => resetDialog()}>
           <div
             className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-[15px] font-semibold text-foreground">
-                {editingVideo ? "Modifier la vidéo" : "Ajouter une vidéo"}
-              </h3>
+              <h3 className="text-[15px] font-semibold text-foreground">Modifier la vidéo</h3>
               <button onClick={resetDialog} className="text-muted-foreground hover:text-foreground">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             <div className="space-y-4">
-              {/* Drop zone */}
-              {!editingVideo && (
-                <div
-                  onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-                  onDragLeave={() => setDragOver(false)}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    setDragOver(false)
-                    const file = e.dataTransfer.files[0]
-                    if (file?.type.startsWith("video/")) handleFileSelect(file)
-                  }}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed p-8 transition-colors ${
-                    dragOver ? "border-[#007AFF] bg-[#EAF3FF]" : "border-border hover:border-[#007AFF]/50"
-                  }`}
-                >
-                  <Upload className="h-6 w-6 text-muted-foreground" />
-                  <p className="text-[12px] text-muted-foreground">
-                    {uploadFile ? uploadFile.name : "Glisse une vidéo ici ou clique pour parcourir"}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">Max 50 MB</p>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="video/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) handleFileSelect(file)
-                    }}
-                  />
-                </div>
-              )}
-
               {/* Preview thumbnail */}
-              {uploadPreview && (
+              {editPreview && (
                 <div className="flex items-center gap-3">
                   <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border-2 border-purple-500 bg-secondary">
-                    {uploadFile ? (
-                      <video
-                        src={uploadPreview}
-                        className="h-full w-full object-cover"
-                        muted
-                      />
-                    ) : (
-                      <img
-                        src={uploadPreview}
-                        className="h-full w-full object-cover"
-                        alt="preview"
-                      />
-                    )}
+                    <img src={editPreview} className="h-full w-full object-cover" alt="preview" />
                   </div>
-                  <span className="text-[11px] text-muted-foreground">Preview thumbnail</span>
+                  <span className="text-[11px] text-muted-foreground">Thumbnail actuelle</span>
                 </div>
               )}
 
@@ -571,12 +714,12 @@ export default function VideosPage() {
                   Annuler
                 </button>
                 <button
-                  onClick={handleUpload}
-                  disabled={uploading || (!uploadFile && !editingVideo) || !uploadName}
+                  onClick={handleEditSave}
+                  disabled={uploading || !uploadName}
                   className="flex items-center gap-2 rounded-lg bg-[#007AFF] px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[#0066DD] disabled:opacity-50"
                 >
                   {uploading && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {uploading ? "Upload..." : editingVideo ? "Sauvegarder" : "Ajouter"}
+                  {uploading ? "Sauvegarde..." : "Sauvegarder"}
                 </button>
               </div>
             </div>
