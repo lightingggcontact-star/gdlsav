@@ -805,7 +805,7 @@ export async function getCollectionProducts(collectionGid: string): Promise<Shop
 
 const ALL_PRODUCTS_QUERY = `
   query AllProducts {
-    products(first: 250, query: "status:active") {
+    products(first: 250) {
       edges {
         node {
           id
