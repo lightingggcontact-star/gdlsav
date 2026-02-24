@@ -683,7 +683,7 @@ export async function searchProducts(query: string): Promise<ShopifyProductResul
   const trimmed = query.trim()
   if (!trimmed) return []
 
-  const shopifyQuery = `title:*${trimmed}* status:active`
+  const shopifyQuery = `${trimmed} status:active`
 
   const response = await shopifyGraphQL(SEARCH_PRODUCTS_QUERY, {
     query: shopifyQuery,

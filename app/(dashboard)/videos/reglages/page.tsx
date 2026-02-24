@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
-import { Settings, Save, ToggleLeft, ToggleRight, Copy, Check } from "lucide-react"
-import type { StoriesSettings } from "@/lib/types"
+import { Settings, Save, ToggleLeft, ToggleRight, Copy, Check, Eye, Play } from "lucide-react"
+import type { StoriesSettings, StoryVideo } from "@/lib/types"
 
 const COLOR_SWATCHES = [
   { label: "Violet", value: "#9333ea" },
@@ -119,20 +119,81 @@ function generateSnippet(apiBase: string) {
 </script>`
 }
 
+function generateDemoSnippet(settings: StoriesSettings) {
+  const size = settings.circle_size
+  const color = settings.border_color
+  const style = settings.border_style
+
+  const ringStyle = style === "gradient"
+    ? `background:linear-gradient(135deg,${color},#ec4899,#f97316);padding:3px`
+    : style === "dashed"
+      ? `border:3px dashed ${color};padding:0`
+      : `border:3px solid ${color};padding:0`
+
+  const innerBorder = style === "gradient" ? "border:3px solid #fff;" : ""
+
+  return `<!-- GDL Stories — CODE DE DEMO (a retirer apres test) -->
+<div style="display:flex;gap:12px;padding:16px 0;overflow-x:auto;">
+  <div style="flex-shrink:0;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;">
+    <div style="border-radius:50%;${ringStyle}">
+      <div style="width:${size}px;height:${size}px;border-radius:50%;${innerBorder}background:linear-gradient(135deg,#9333ea20,#ec489920);display:flex;align-items:center;justify-content:center;font-size:28px;">
+        🍃
+      </div>
+    </div>
+    <span style="font-size:11px;color:#666;">🍃 Amnésia</span>
+  </div>
+  <div style="flex-shrink:0;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;">
+    <div style="border-radius:50%;${ringStyle}">
+      <div style="width:${size}px;height:${size}px;border-radius:50%;${innerBorder}background:linear-gradient(135deg,#f9731620,#9333ea20);display:flex;align-items:center;justify-content:center;font-size:28px;">
+        📦
+      </div>
+    </div>
+    <span style="font-size:11px;color:#666;">📦 Préparation</span>
+  </div>
+  <div style="flex-shrink:0;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;">
+    <div style="border-radius:50%;${ringStyle}">
+      <div style="width:${size}px;height:${size}px;border-radius:50%;${innerBorder}background:linear-gradient(135deg,#ec489920,#f9731620);display:flex;align-items:center;justify-content:center;font-size:28px;">
+        🔥
+      </div>
+    </div>
+    <span style="font-size:11px;color:#666;">🔥 Review</span>
+  </div>
+  <div style="flex-shrink:0;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;">
+    <div style="border-radius:50%;${ringStyle}">
+      <div style="width:${size}px;height:${size}px;border-radius:50%;${innerBorder}background:linear-gradient(135deg,#047B5D20,#9333ea20);display:flex;align-items:center;justify-content:center;font-size:28px;">
+        💨
+      </div>
+    </div>
+    <span style="font-size:11px;color:#666;">💨 Session</span>
+  </div>
+</div>
+<!-- FIN CODE DE DEMO -->`
+}
+
 export default function ReglagesPage() {
   const [settings, setSettings] = useState<StoriesSettings | null>(null)
+  const [videos, setVideos] = useState<StoryVideo[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [copiedDemo, setCopiedDemo] = useState(false)
+  const [previewVideo, setPreviewVideo] = useState<StoryVideo | null>(null)
 
   useEffect(() => {
-    async function fetchSettings() {
+    async function fetchData() {
       try {
-        const res = await fetch("/api/stories/settings")
-        if (res.ok) {
-          const data = await res.json()
+        const [settingsRes, videosRes] = await Promise.all([
+          fetch("/api/stories/settings"),
+          fetch("/api/stories/videos"),
+        ])
+        if (settingsRes.ok) {
+          const data = await settingsRes.json()
           setSettings(data.settings)
+        }
+        if (videosRes.ok) {
+          const data = await videosRes.json()
+          setVideos(data.videos ?? [])
         }
       } catch {
         // silent
@@ -140,7 +201,7 @@ export default function ReglagesPage() {
         setLoading(false)
       }
     }
-    fetchSettings()
+    fetchData()
   }, [])
 
   async function handleSave() {
@@ -381,6 +442,171 @@ export default function ReglagesPage() {
           {generateSnippet(typeof window !== "undefined" ? window.location.origin : "https://gdl-sav.vercel.app")}
         </pre>
       </div>
+
+      {/* Demo snippet */}
+      <div className="rounded-lg border-2 border-dashed border-orange-300 bg-orange-50 p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-md bg-orange-200 px-2 py-0.5 text-[10px] font-bold uppercase text-orange-700">
+                Demo
+              </span>
+              <h3 className="text-[14px] font-semibold text-foreground">Code de preview</h3>
+            </div>
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              Colle ce code dans ton thème pour voir le rendu des ronds (sans API). Retire-le quand t&apos;as trouvé le bon emplacement, puis colle le vrai snippet au-dessus.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(generateDemoSnippet(settings))
+              setCopiedDemo(true)
+              setTimeout(() => setCopiedDemo(false), 2000)
+            }}
+            className="flex items-center gap-1.5 rounded-lg border border-orange-300 bg-white px-3 py-1.5 text-[12px] font-medium transition-colors hover:bg-orange-100"
+          >
+            {copiedDemo ? (
+              <>
+                <Check className="h-3.5 w-3.5 text-[#047B5D]" />
+                Copié !
+              </>
+            ) : (
+              <>
+                <Copy className="h-3.5 w-3.5" />
+                Copier
+              </>
+            )}
+          </button>
+        </div>
+        <pre className="max-h-48 overflow-auto rounded-lg bg-[#1a1a1a] p-4 text-[11px] text-orange-300 font-mono leading-relaxed">
+          {generateDemoSnippet(settings)}
+        </pre>
+      </div>
+
+      {/* Preview live */}
+      <div className="rounded-lg border border-border bg-card p-5 shadow-[0_1px_0_0_rgba(0,0,0,.05)]">
+        <div className="mb-4 flex items-center gap-2">
+          <Eye className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-[14px] font-semibold text-foreground">Preview</h3>
+          <span className="text-[11px] text-muted-foreground">— rendu sur la page produit</span>
+        </div>
+
+        {/* Simulated product page */}
+        <div className="rounded-lg border border-border bg-white p-5">
+          {/* Fake product header */}
+          <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Graine de Lascars
+          </div>
+          <div className="mb-1 text-[16px] font-semibold text-foreground">
+            Nom du Produit
+          </div>
+          <div className="mb-4 text-[14px] font-medium text-muted-foreground">
+            29,90 €
+          </div>
+
+          {/* Stories row */}
+          {videos.length > 0 ? (
+            <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
+              {videos.map((video) => {
+                const borderStyle = settings.border_style === "gradient"
+                  ? { background: `linear-gradient(135deg, ${settings.border_color}, #ec4899, #f97316)` }
+                  : settings.border_style === "dashed"
+                    ? { border: `3px dashed ${settings.border_color}` }
+                    : { border: `3px solid ${settings.border_color}` }
+
+                return (
+                  <div
+                    key={video.id}
+                    className="flex shrink-0 cursor-pointer flex-col items-center gap-1.5"
+                    onClick={() => setPreviewVideo(video)}
+                  >
+                    <div
+                      className="rounded-full"
+                      style={{
+                        padding: settings.border_style === "gradient" ? 3 : 0,
+                        ...borderStyle,
+                      }}
+                    >
+                      <div
+                        className="overflow-hidden rounded-full bg-gray-100"
+                        style={{
+                          width: settings.circle_size,
+                          height: settings.circle_size,
+                          border: settings.border_style === "gradient" ? "3px solid white" : "none",
+                        }}
+                      >
+                        {video.thumbnail_url ? (
+                          <img
+                            src={video.thumbnail_url}
+                            alt={video.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-2xl">
+                            {video.emoji}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <span
+                      className="text-[10px] text-gray-500 text-center"
+                      style={{ maxWidth: settings.circle_size }}
+                    >
+                      {video.emoji} {video.name}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-lg border border-dashed border-border py-6 px-4">
+              <Play className="h-4 w-4 text-muted-foreground" />
+              <span className="text-[12px] text-muted-foreground">
+                Ajoute des vidéos dans la bibliothèque pour voir la preview
+              </span>
+            </div>
+          )}
+
+          {/* Fake add to cart */}
+          <div className="mt-4 flex gap-2">
+            <div className="h-10 flex-1 rounded-lg bg-gray-900 flex items-center justify-center">
+              <span className="text-[12px] font-medium text-white">Ajouter au panier</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Video preview player */}
+      {previewVideo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={() => setPreviewVideo(null)}
+        >
+          <div
+            className="relative w-[350px] overflow-hidden rounded-2xl bg-black shadow-2xl"
+            style={{ aspectRatio: "9/16" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <video
+              src={previewVideo.video_url}
+              className="h-full w-full object-cover"
+              autoPlay
+              muted
+              playsInline
+              controls
+            />
+            <button
+              onClick={() => setPreviewVideo(null)}
+              className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70"
+            >
+              ×
+            </button>
+            <div className="absolute bottom-4 left-4 right-4 text-[13px] font-semibold text-white drop-shadow-lg">
+              {previewVideo.emoji} {previewVideo.name}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Last updated */}
       <p className="text-[11px] text-muted-foreground">
