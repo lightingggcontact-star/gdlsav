@@ -295,10 +295,19 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
   return (
     <div className="space-y-3">
       <div className={cn("rounded-lg border border-border overflow-hidden bg-card shadow-[0_1px_0_0_rgba(0,0,0,.05)]", isDragging && "select-none")}>
-        <Table>
+        <Table className="table-fixed w-full">
+          <colgroup>
+            <col className="w-10" />
+            <col className="w-[11%]" />
+            <col className="w-[22%]" />
+            <col className="w-[10%]" />
+            <col className="w-[10%]" />
+            <col />
+            <col className="w-24" />
+          </colgroup>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-b border-border">
-              <TableHead className="w-10">
+              <TableHead>
                 <Checkbox
                   checked={allPageSelected ? true : somePageSelected ? "indeterminate" : false}
                   onCheckedChange={toggleAll}
@@ -310,7 +319,7 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
               <SortHeader label="Expédié" sortKeyName="shippedAt" />
               <SortHeader label="Durée" sortKeyName="businessDaysElapsed" />
               <SortHeader label="Statut" sortKeyName="alertLevel" />
-              <TableHead className="w-25" />
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -418,23 +427,26 @@ export function ShippingTable({ orders, trackingMap, onSelectOrder, selectedIds,
                   </TableCell>
 
                   {/* Statut + keyword */}
-                  <TableCell>
+                  <TableCell className="overflow-hidden">
                     <Tooltip>
                       <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
                         <div className="space-y-0.5 cursor-default">
                           <Badge variant="outline" className={cn("text-[10px] font-medium", statusConfig.badgeClassName)}>
                             {statusConfig.label}
                           </Badge>
-                          {tracking?.lastEventLabel && (
-                            <p className="text-[11px] text-muted-foreground">
-                              <span className="font-medium text-foreground">{extractKeyPhrase(tracking.lastEventLabel) ?? tracking.lastEventLabel.slice(0, 30)}</span>
-                              {tracking.lastEventDate && (
-                                <span className="text-muted-foreground/50 ml-1 text-[10px]">
-                                  {new Date(tracking.lastEventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
-                                </span>
-                              )}
-                            </p>
-                          )}
+                          {(() => {
+                            const kw = tracking?.lastEventLabel ? extractKeyPhrase(tracking.lastEventLabel) : null
+                            const date = tracking?.lastEventDate
+                              ? new Date(tracking.lastEventDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })
+                              : null
+                            if (!kw && !date) return null
+                            return (
+                              <p className="text-[11px] text-muted-foreground truncate">
+                                {kw && <span className="font-medium text-foreground">{kw}</span>}
+                                {date && <span className="text-muted-foreground/50 ml-1 text-[10px]">{date}</span>}
+                              </p>
+                            )
+                          })()}
                         </div>
                       </TooltipTrigger>
                       {tracking?.lastEventLabel && (
