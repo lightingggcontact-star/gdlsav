@@ -1,10 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { searchProducts } from "@/lib/shopify"
+import { searchProducts, getAllProducts } from "@/lib/shopify"
 
 export const dynamic = "force-dynamic"
 
 export async function GET(request: NextRequest) {
   try {
+    const all = request.nextUrl.searchParams.get("all")
+
+    if (all === "true") {
+      const products = await getAllProducts()
+      return NextResponse.json({ products })
+    }
+
     const q = request.nextUrl.searchParams.get("q")
 
     if (!q || q.trim().length < 2) {

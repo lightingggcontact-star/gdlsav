@@ -710,3 +710,45 @@ export async function searchProducts(query: string): Promise<ShopifyProductResul
     }
   })
 }
+
+const ALL_PRODUCTS_QUERY = `
+  query AllProducts {
+    products(first: 250, query: "status:active") {
+      edges {
+        node {
+          id
+          title
+          handle
+          featuredImage {
+            url
+          }
+        }
+      }
+    }
+  }
+`
+
+export async function getAllProducts(): Promise<ShopifyProductResult[]> {
+  const response = await shopifyGraphQL(ALL_PRODUCTS_QUERY, {})
+
+  if (response.errors?.length) {
+    throw new Error(
+      `Shopify GraphQL errors: ${response.errors.map((e) => e.message).join(", ")}`
+    )
+  }
+
+  const edges = (response.data as any)?.products?.edges ?? []
+
+  return edges.map((edge: any) => {
+    const node = edge.node
+    const gid = node.id as string
+    const numericId = gid.split("/").pop() ?? gid
+    return {
+      id: gid,
+      numericId,
+      title: node.title,
+      handle: node.handle,
+      imageUrl: node.featuredImage?.url ?? null,
+    }
+  })
+}

@@ -28,14 +28,17 @@ function ProductSearchInput({
   selected,
   onAdd,
   onRemove,
+  onSelectAll,
 }: {
   selected: ProductTag[]
   onAdd: (p: ProductTag) => void
   onRemove: (id: string) => void
+  onSelectAll: (products: ProductTag[]) => void
 }) {
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<ProductTag[]>([])
   const [searching, setSearching] = useState(false)
+  const [loadingAll, setLoadingAll] = useState(false)
   const [open, setOpen] = useState(false)
   const timerRef = useRef<number | null>(null)
 
@@ -64,39 +67,65 @@ function ProductSearchInput({
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
   }, [query])
 
+  async function handleSelectAll() {
+    setLoadingAll(true)
+    try {
+      const res = await fetch("/api/shopify/search-products?all=true")
+      const data = await res.json()
+      const all: ProductTag[] = (data.products ?? []).map((p: any) => ({
+        id: p.numericId,
+        title: p.title,
+      }))
+      onSelectAll(all)
+    } catch {
+      // silent
+    } finally {
+      setLoadingAll(false)
+    }
+  }
+
   return (
     <div className="space-y-2">
-      <div className="relative">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => results.length > 0 && setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 200)}
-          placeholder="Chercher un produit Shopify..."
-          className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-[13px] outline-none focus:border-[#007AFF]"
-        />
-        {searching && <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
-        {open && results.length > 0 && (
-          <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-48 overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
-            {results
-              .filter((r) => !selected.some((s) => s.id === r.id))
-              .map((p) => (
-                <button
-                  key={p.id}
-                  onMouseDown={() => {
-                    onAdd(p)
-                    setQuery("")
-                    setOpen(false)
-                  }}
-                  className="block w-full px-3 py-2 text-left text-[13px] hover:bg-secondary transition-colors"
-                >
-                  {p.title}
-                </button>
-              ))}
-          </div>
-        )}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => results.length > 0 && setOpen(true)}
+            onBlur={() => setTimeout(() => setOpen(false), 200)}
+            placeholder="Chercher un produit..."
+            className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-[13px] outline-none focus:border-[#007AFF]"
+          />
+          {searching && <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
+          {open && results.length > 0 && (
+            <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-48 overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
+              {results
+                .filter((r) => !selected.some((s) => s.id === r.id))
+                .map((p) => (
+                  <button
+                    key={p.id}
+                    onMouseDown={() => {
+                      onAdd(p)
+                      setQuery("")
+                      setOpen(false)
+                    }}
+                    className="block w-full px-3 py-2 text-left text-[13px] hover:bg-secondary transition-colors"
+                  >
+                    {p.title}
+                  </button>
+                ))}
+            </div>
+          )}
+        </div>
+        <button
+          onClick={handleSelectAll}
+          disabled={loadingAll}
+          className="shrink-0 rounded-lg border border-border px-3 py-2 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+        >
+          {loadingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Tous"}
+        </button>
       </div>
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
@@ -111,6 +140,14 @@ function ProductSearchInput({
               </button>
             </span>
           ))}
+          {selected.length > 1 && (
+            <button
+              onClick={() => selected.forEach((p) => onRemove(p.id))}
+              className="text-[10px] text-muted-foreground hover:text-[#E51C00] transition-colors"
+            >
+              Tout retirer
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -702,6 +739,7 @@ export default function VideosPage() {
                   selected={uploadProducts}
                   onAdd={(p) => setUploadProducts((prev) => [...prev, p])}
                   onRemove={(id) => setUploadProducts((prev) => prev.filter((p) => p.id !== id))}
+                  onSelectAll={(all) => setUploadProducts(all)}
                 />
               </div>
 
