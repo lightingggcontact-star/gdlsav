@@ -252,7 +252,8 @@ export default function VideosPage() {
       // Upload nouveau fichier si fourni
       if (uploadFile) {
         const ts = Date.now()
-        const videoPath = `videos/${ts}-${uploadFile.name}`
+        const safeName = uploadFile.name.replace(/[^\w.-]/g, '_')
+        const videoPath = `videos/${ts}-${safeName}`
         const { error: uploadErr } = await supabase.storage
           .from("stories")
           .upload(videoPath, uploadFile, { cacheControl: "3600", contentType: uploadFile.type })
