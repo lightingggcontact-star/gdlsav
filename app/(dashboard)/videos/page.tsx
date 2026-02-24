@@ -115,6 +115,24 @@ function ProductSearchInput({
     }
   }
 
+  async function handleAllProducts() {
+    setCollectionOpen(false)
+    setLoadingCollection(true)
+    try {
+      const res = await fetch("/api/shopify/search-products?all=true")
+      const data = await res.json()
+      const products: ProductTag[] = (data.products ?? []).map((p: any) => ({
+        id: p.numericId,
+        title: p.title,
+      }))
+      onBulkAdd(products)
+    } catch {
+      // silent
+    } finally {
+      setLoadingCollection(false)
+    }
+  }
+
   return (
     <div className="space-y-2">
       <div className="flex gap-2">
@@ -162,6 +180,12 @@ function ProductSearchInput({
           </button>
           {collectionOpen && collections.length > 0 && (
             <div className="absolute top-full right-0 z-50 mt-1 w-56 max-h-60 overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
+              <button
+                onClick={handleAllProducts}
+                className="block w-full px-3 py-2 text-left text-[12px] font-semibold text-[#007AFF] hover:bg-secondary transition-colors border-b border-border"
+              >
+                Tous les produits
+              </button>
               {collections.map((col) => (
                 <button
                   key={col.numericId}
