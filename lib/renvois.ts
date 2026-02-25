@@ -103,6 +103,39 @@ export async function markColisRevenu(supabase: SupabaseClient, id: string, reve
   await supabase.from("renvois").update({ colis_revenu: revenu }).eq("id", id)
 }
 
+/** Create a renvoi already marked as colis_revenu (for packages that come back without a prior renvoi) */
+export async function createColisRevenu(
+  supabase: SupabaseClient,
+  input: {
+    shopifyOrderId: string
+    orderName: string
+    orderTotal: string
+    customerName: string
+    customerEmail: string
+  }
+): Promise<Renvoi> {
+  const { data, error } = await supabase
+    .from("renvois")
+    .insert({
+      shopify_order_id: input.shopifyOrderId,
+      order_name: input.orderName,
+      order_total: input.orderTotal,
+      customer_name: input.customerName,
+      customer_email: input.customerEmail,
+      reason: "retour_client",
+      status: "livre",
+      tracking_number: "",
+      note: "",
+      renvoi_date: new Date().toISOString().split("T")[0],
+      colis_revenu: true,
+    })
+    .select()
+    .single()
+
+  if (error || !data) throw new Error("Impossible de creer le colis revenu")
+  return mapRow(data)
+}
+
 export async function deleteRenvoi(supabase: SupabaseClient, id: string) {
   await supabase.from("renvois").delete().eq("id", id)
 }

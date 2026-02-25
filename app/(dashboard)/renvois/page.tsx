@@ -13,6 +13,7 @@ import {
   updateRenvoiNote,
   deleteRenvoi,
   markColisRevenu,
+  createColisRevenu,
   deriveRenvoiStatusFromTracking,
   REASON_OPTIONS,
 } from "@/lib/renvois"
@@ -204,11 +205,23 @@ export default function RenvoisPage() {
     toast.success("Renvoi supprime")
   }
 
-  async function handleColisRevenu(renvoiId: string) {
+  async function handleColisRevenuExisting(renvoiId: string) {
     setRenvois((prev) => prev.map((r) => (r.id === renvoiId ? { ...r, colisRevenu: true } : r)))
     await markColisRevenu(supabase, renvoiId, true)
     const r = renvois.find((r) => r.id === renvoiId)
     toast.success(`Colis revenu ${r?.orderName ?? ""} enregistre`)
+  }
+
+  async function handleColisRevenuNew(order: { id: string; name: string; totalPrice: string; customerName: string; customerEmail: string }) {
+    const newRenvoi = await createColisRevenu(supabase, {
+      shopifyOrderId: order.id,
+      orderName: order.name,
+      orderTotal: order.totalPrice,
+      customerName: order.customerName,
+      customerEmail: order.customerEmail,
+    })
+    setRenvois((prev) => [newRenvoi, ...prev])
+    toast.success(`Colis revenu ${order.name} enregistre`)
   }
 
   // ─── Loading ─────────────────────────────────────────
@@ -313,7 +326,8 @@ export default function RenvoisPage() {
         open={showColisRevenu}
         onOpenChange={setShowColisRevenu}
         renvois={renvois}
-        onConfirm={handleColisRevenu}
+        onConfirmExisting={handleColisRevenuExisting}
+        onConfirmNew={handleColisRevenuNew}
       />
 
       {/* Create Dialog */}
