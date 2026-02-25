@@ -8,7 +8,7 @@ interface UseRealtimeTicketsOptions {
   userId: string | null
   enabled: boolean
   onLabelChange: (ticketId: string, label: string | null, eventType: string) => void
-  onRepliedStatusChange: (ticketId: number, repliedByUserId: string, repliedAt: string) => void
+  onRepliedStatusChange: (ticketId: string, repliedByUserId: string, repliedAt: string) => void
   onNewTicketDetected: (count: number) => void
 }
 
@@ -20,8 +20,6 @@ export function useRealtimeTickets({
   onRepliedStatusChange,
   onNewTicketDetected,
 }: UseRealtimeTicketsOptions) {
-  const knownTicketIds = useRef<Set<number> | null>(null)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const callbacksRef = useRef({ onLabelChange, onRepliedStatusChange, onNewTicketDetected })
 
   // Keep callbacks fresh without re-subscribing
@@ -30,10 +28,9 @@ export function useRealtimeTickets({
   useEffect(() => {
     if (!enabled || !userId) return
 
-    // ─── Supabase Realtime subscriptions ───
-
     const channel = supabase
       .channel("tickets-realtime")
+      // Labels
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "ticket_labels" },
@@ -49,59 +46,32 @@ export function useRealtimeTickets({
           }
         }
       )
+      // Replied status from colleagues
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "ticket_replied_status" },
         (payload) => {
-          const row = payload.new as { user_id: string; ticket_id: number; replied_at: string }
-          // Only notify if a colleague replied (not self)
+          const row = payload.new as { user_id: string; ticket_id: string; replied_at: string }
           if (row.user_id !== userId) {
             callbacksRef.current.onRepliedStatusChange(row.ticket_id, row.user_id, row.replied_at)
           }
         }
       )
+      // New emails from customers (not from agent)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "email_messages" },
+        (payload) => {
+          const row = payload.new as { from_agent: boolean }
+          if (!row.from_agent) {
+            callbacksRef.current.onNewTicketDetected(1)
+          }
+        }
+      )
       .subscribe()
-
-    // ─── Poll for new Gorgias tickets every 60s ───
-
-    async function pollNewTickets() {
-      try {
-        const res = await fetch("/api/gorgias/tickets")
-        if (!res.ok) return
-        const data = await res.json()
-        const tickets: { id: number }[] = data.tickets || data || []
-        const currentIds = new Set(tickets.map(t => t.id))
-
-        if (knownTicketIds.current === null) {
-          // First poll — just initialize, don't notify
-          knownTicketIds.current = currentIds
-          return
-        }
-
-        // Find new ticket IDs
-        const newIds: number[] = []
-        currentIds.forEach(id => {
-          if (!knownTicketIds.current!.has(id)) newIds.push(id)
-        })
-
-        if (newIds.length > 0) {
-          knownTicketIds.current = currentIds
-          callbacksRef.current.onNewTicketDetected(newIds.length)
-        } else {
-          knownTicketIds.current = currentIds
-        }
-      } catch {
-        // Silent fail — network issues
-      }
-    }
-
-    // Initial poll (silent)
-    pollNewTickets()
-    pollRef.current = setInterval(pollNewTickets, 60_000)
 
     return () => {
       supabase.removeChannel(channel)
-      if (pollRef.current) clearInterval(pollRef.current)
     }
   }, [supabase, userId, enabled])
 }

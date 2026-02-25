@@ -45,7 +45,7 @@ import { playNotificationSound, requestNotificationPermission, showDesktopNotifi
 // ─── Types ───
 
 interface GorgiasCustomer {
-  id: number
+  id: number | string
   name: string
   email: string
 }
@@ -58,8 +58,8 @@ interface GorgiasAttachment {
 }
 
 interface GorgiasMessage {
-  id: number
-  ticket_id: number
+  id: number | string
+  ticket_id: number | string
   channel: string
   from_agent: boolean
   sender: { id?: number; name?: string; email?: string }
@@ -72,13 +72,13 @@ interface GorgiasMessage {
 }
 
 interface GorgiasTag {
-  id: number
+  id: number | string
   name: string
   decoration?: { color?: string }
 }
 
 interface GorgiasTicket {
-  id: number
+  id: number | string
   subject: string | null
   status: "open" | "closed"
   priority: "urgent" | "high" | "normal" | "low" | null
@@ -311,11 +311,11 @@ export default function MessagesPage() {
   // Ticket labels & selection
   const [ticketLabels, setTicketLabels] = useState<Record<string, TicketLabel>>({})
   const [activeTab, setActiveTab] = useState<"all" | "urgent" | "en_attente">("all")
-  const [selectedTicketIds, setSelectedTicketIds] = useState<Set<number>>(new Set())
+  const [selectedTicketIds, setSelectedTicketIds] = useState<Set<string>>(new Set())
   const [bulkClosing, setBulkClosing] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
-  const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null)
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
   const [messages, setMessages] = useState<GorgiasMessage[]>([])
   const [messagesLoading, setMessagesLoading] = useState(false)
 
@@ -377,9 +377,9 @@ export default function MessagesPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // ─── Read / Replied tracking (Supabase) ───
-  const [readIds, setReadIds] = useState<Set<number>>(new Set())
+  const [readIds, setReadIds] = useState<Set<string>>(new Set())
   // repliedMap: ticketId → timestamp when we replied
-  const [repliedMap, setRepliedMap] = useState<Map<number, string>>(new Map())
+  const [repliedMap, setRepliedMap] = useState<Map<string, string>>(new Map())
 
   // Load user ID, read/replied status, and labels from Supabase on mount
   useEffect(() => {
@@ -407,7 +407,7 @@ export default function MessagesPage() {
           .select("ticket_id")
           .eq("user_id", user.id)
         if (readRows) {
-          setReadIds(new Set(readRows.map((r: { ticket_id: number }) => r.ticket_id)))
+          setReadIds(new Set(readRows.map((r: { ticket_id: string }) => String(r.ticket_id))))
         }
 
         // Load replied ticket IDs + timestamps
@@ -417,7 +417,7 @@ export default function MessagesPage() {
           .eq("user_id", user.id)
         if (repliedRows) {
           setRepliedMap(new Map(
-            repliedRows.map((r: { ticket_id: number; replied_at: string }) => [r.ticket_id, r.replied_at])
+            repliedRows.map((r: { ticket_id: string; replied_at: string }) => [String(r.ticket_id), r.replied_at])
           ))
         }
       } catch { /* silent */ }
@@ -442,7 +442,7 @@ export default function MessagesPage() {
       })
     },
     onRepliedStatusChange: (ticketId, _repliedByUserId, repliedAt) => {
-      toast.info(`Un collègue a répondu au ticket #${ticketId}`)
+      toast.info(`Un collègue a répondu à un ticket`)
       playNotificationSound()
       setRepliedMap(prev => {
         const next = new Map(prev)
@@ -458,12 +458,12 @@ export default function MessagesPage() {
       })
       showDesktopNotification(
         "GDL SAV",
-        `${count} nouveau${count > 1 ? "x" : ""} ticket${count > 1 ? "s" : ""} Gorgias`
+        `${count} nouveau${count > 1 ? "x" : ""} email${count > 1 ? "s" : ""}`
       )
     },
   })
 
-  async function markAsRead(ticketId: number) {
+  async function markAsRead(ticketId: string) {
     setReadIds(prev => {
       const next = new Set(prev)
       next.add(ticketId)
@@ -476,7 +476,7 @@ export default function MessagesPage() {
     }
   }
 
-  async function markAsReplied(ticketId: number) {
+  async function markAsReplied(ticketId: string) {
     const now = new Date().toISOString()
     setRepliedMap(prev => {
       const next = new Map(prev)
@@ -492,7 +492,7 @@ export default function MessagesPage() {
 
   /** Check if ticket has new customer message after our reply */
   function hasNewMessageAfterReply(ticket: GorgiasTicket): boolean {
-    const repliedAt = repliedMap.get(ticket.id)
+    const repliedAt = repliedMap.get(String(ticket.id))
     if (!repliedAt) return false
     const lastMsg = ticket.last_message_datetime || ticket.updated_datetime
     return new Date(lastMsg).getTime() > new Date(repliedAt).getTime() + 60000 // 1min buffer
@@ -500,18 +500,19 @@ export default function MessagesPage() {
 
   /** Get ticket status: "unread" | "replied" | "read" */
   function getTicketReadStatus(ticket: GorgiasTicket): "unread" | "replied" | "read" {
-    const isReplied = repliedMap.has(ticket.id)
+    const tid = String(ticket.id)
+    const isReplied = repliedMap.has(tid)
     // If we replied but customer sent a new message → treat as unread again
     if (isReplied && hasNewMessageAfterReply(ticket)) {
       // Remove from replied since customer responded
       setRepliedMap(prev => {
         const next = new Map(prev)
-        next.delete(ticket.id)
+        next.delete(tid)
         return next
       })
       setReadIds(prev => {
         const next = new Set(prev)
-        next.delete(ticket.id)
+        next.delete(tid)
         return next
       })
       // Fire-and-forget Supabase cleanup
@@ -520,19 +521,19 @@ export default function MessagesPage() {
           .from("ticket_replied_status")
           .delete()
           .eq("user_id", userId)
-          .eq("ticket_id", ticket.id)
+          .eq("ticket_id", tid)
           .then()
         supabase
           .from("ticket_read_status")
           .delete()
           .eq("user_id", userId)
-          .eq("ticket_id", ticket.id)
+          .eq("ticket_id", tid)
           .then()
       }
       return "unread"
     }
     if (isReplied) return "replied"
-    if (readIds.has(ticket.id)) return "read"
+    if (readIds.has(tid)) return "read"
     return "unread"
   }
 
@@ -670,7 +671,14 @@ export default function MessagesPage() {
     if (sidebarMode === "sms") {
       await fetchSmsConversations()
     } else {
-      await fetchTickets()
+      // Sync IMAP then fetch
+      try {
+        const res = await fetch("/api/gorgias/tickets?sync=1")
+        if (res.ok) {
+          const data = await res.json()
+          setAllTickets(data.data || [])
+        }
+      } catch { /* silent */ }
       if (selectedTicketId) await fetchMessages(selectedTicketId)
     }
     setRefreshing(false)
@@ -699,7 +707,7 @@ export default function MessagesPage() {
 
       // Fetch messages for each ticket (in parallel, max 5 at a time)
       const ticketsForRecap: Array<{
-        id: number; subject: string | null; status: string; priority: string | null
+        id: number | string; subject: string | null; status: string; priority: string | null
         customerName: string; customerEmail: string; createdAt: string
         tags: string[]; firstMessage: string; lastMessage: string; messageCount: number
       }> = []
@@ -899,7 +907,7 @@ export default function MessagesPage() {
 
   // ─── Fetch messages ───
 
-  async function fetchMessages(ticketId: number) {
+  async function fetchMessages(ticketId: string | number) {
     setMessagesLoading(true)
     setMessages([])
     try {
@@ -1030,7 +1038,8 @@ export default function MessagesPage() {
   }, [joyDropdownOpen])
 
   function handleSelectTicket(ticket: GorgiasTicket) {
-    setSelectedTicketId(ticket.id)
+    const tid = String(ticket.id)
+    setSelectedTicketId(tid)
     setReplyText("")
     setSendSuccess(false)
     setAiChatOpen(false)
@@ -1038,8 +1047,8 @@ export default function MessagesPage() {
     setAiChatInput("")
     setJoyDropdownOpen(false)
     setJoyAddPoints("")
-    markAsRead(ticket.id)
-    fetchMessages(ticket.id)
+    markAsRead(tid)
+    fetchMessages(tid)
     fetchCustomerOrders(ticket.customer.email)
     fetchJoyPoints(ticket.customer.email)
   }
@@ -1301,8 +1310,8 @@ export default function MessagesPage() {
   function TicketGroup({ tickets }: { tickets: GorgiasTicket[] }) {
     const first = tickets[0]
     const customerName = first.customer.name || first.customer.email.split("@")[0]
-    const anyBulkSelected = tickets.some(t => selectedTicketIds.has(t.id))
-    const allBulkSelected = tickets.every(t => selectedTicketIds.has(t.id))
+    const anyBulkSelected = tickets.some(t => selectedTicketIds.has(String(t.id)))
+    const allBulkSelected = tickets.every(t => selectedTicketIds.has(String(t.id)))
     const hasMultiple = tickets.length > 1
 
     // Single ticket — flat row, no wrapper
@@ -1312,7 +1321,7 @@ export default function MessagesPage() {
       const lastDate = ticket.last_message_datetime || ticket.updated_datetime
       const ticketStatus = getTicketReadStatus(ticket)
       const ticketLabel = ticketLabels[String(ticket.id)] as TicketLabel | undefined
-      const isBulkSelected = selectedTicketIds.has(ticket.id)
+      const isBulkSelected = selectedTicketIds.has(String(ticket.id))
 
       return (
         <button
@@ -1336,8 +1345,9 @@ export default function MessagesPage() {
               e.stopPropagation()
               setSelectedTicketIds(prev => {
                 const next = new Set(prev)
-                if (next.has(ticket.id)) next.delete(ticket.id)
-                else next.add(ticket.id)
+                const tid = String(ticket.id)
+                if (next.has(tid)) next.delete(tid)
+                else next.add(tid)
                 return next
               })
             }}
@@ -1411,7 +1421,7 @@ export default function MessagesPage() {
     const mainStatus = getTicketReadStatus(mainTicket)
     const mainLabel = ticketLabels[String(mainTicket.id)] as TicketLabel | undefined
     const mainSelected = mainTicket.id === selectedTicketId
-    const mainBulkSelected = selectedTicketIds.has(mainTicket.id)
+    const mainBulkSelected = selectedTicketIds.has(String(mainTicket.id))
     const mainLastDate = mainTicket.last_message_datetime || mainTicket.updated_datetime
 
     return (
@@ -1436,7 +1446,7 @@ export default function MessagesPage() {
             className="relative shrink-0 cursor-pointer mt-0.5"
             onClick={(e) => {
               e.stopPropagation()
-              const ids = tickets.map(t => t.id)
+              const ids = tickets.map(t => String(t.id))
               setSelectedTicketIds(prev => {
                 const next = new Set(prev)
                 if (allBulkSelected) ids.forEach(id => next.delete(id))
@@ -1538,7 +1548,7 @@ export default function MessagesPage() {
           const lastDate = ticket.last_message_datetime || ticket.updated_datetime
           const ticketStatus = getTicketReadStatus(ticket)
           const ticketLabel = ticketLabels[String(ticket.id)] as TicketLabel | undefined
-          const isBulkSelected = selectedTicketIds.has(ticket.id)
+          const isBulkSelected = selectedTicketIds.has(String(ticket.id))
 
           return (
             <button
@@ -2423,14 +2433,15 @@ export default function MessagesPage() {
                         Fermer
                       </button>
                     )}
-                    <a
-                      href={`https://grainedelascars.gorgias.com/app/ticket/${selectedTicket.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(selectedTicket.customer.email)
+                        toast.success("Email copié")
+                      }}
                       className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-black/[0.04] transition-colors"
                     >
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
+                      <Copy className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
 

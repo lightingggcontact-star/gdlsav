@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getGorgiasConfig, gorgiasFetch, fetchAllTickets } from "@/lib/gorgias"
+import { syncInbox } from "@/lib/mail"
 
 export const dynamic = "force-dynamic"
+export const maxDuration = 60
 
 function classifyTicket(subject: string | null, firstMessage: string): string {
   const text = `${subject || ""} ${firstMessage}`.toLowerCase()
@@ -15,131 +16,110 @@ function classifyTicket(subject: string | null, firstMessage: string): string {
   return "autre"
 }
 
-function stripHtml(html: string): string {
-  return html
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/\s+/g, " ")
-    .trim()
-}
-
 export async function POST() {
   try {
     const supabase = await createClient()
-    const { baseUrl, headers } = getGorgiasConfig()
 
-    // 1. Fetch all tickets from Gorgias
-    const tickets = await fetchAllTickets(4)
+    // 1. Sync IMAP first
+    const syncResult = await syncInbox(supabase)
 
-    // 2. Get IDs already cached so we only fetch messages for new/updated ones
+    // 2. Get all threads with their first message for classification
+    const { data: threads } = await supabase
+      .from("email_threads")
+      .select("id, subject, created_at, updated_at, status, customer_name, customer_email, message_count")
+      .order("last_message_at", { ascending: false })
+      .limit(300)
+
+    if (!threads?.length) {
+      return NextResponse.json({ total: 0, synced: 0, skipped: 0 })
+    }
+
+    // 3. Get existing cached IDs
     const { data: existingRows } = await supabase
       .from("ticket_cache")
       .select("ticket_id, updated_at")
 
-    const existingMap = new Map<number, string>()
+    const existingMap = new Map<string, string>()
     if (existingRows) {
       for (const row of existingRows) {
-        existingMap.set(row.ticket_id, row.updated_at)
+        existingMap.set(String(row.ticket_id), row.updated_at)
       }
     }
 
-    // 3. Filter to tickets that need updating
-    const toSync = tickets.filter((t: any) => {
+    // 4. Filter to threads that need updating
+    const toSync = threads.filter((t) => {
       const cached = existingMap.get(t.id)
       if (!cached) return true
-      return new Date(t.updated_datetime) > new Date(cached)
+      return new Date(t.updated_at) > new Date(cached)
     })
 
-    // 4. Fetch messages for tickets that need sync (batch of 10)
     let synced = 0
     for (let i = 0; i < toSync.length; i += 10) {
       const batch = toSync.slice(i, i + 10)
 
-      // Fetch messages once per ticket and build both cache + analysis rows
       const batchData = await Promise.all(
-        batch.map(async (ticket: any) => {
-          let firstMessage = ""
-          let lastMessage = ""
-          let messageCount = 0
-          let firstReplyAt: string | null = null
+        batch.map(async (thread) => {
+          // Get first and last message
+          const { data: messages } = await supabase
+            .from("email_messages")
+            .select("body_text, body_html, from_agent, created_at")
+            .eq("thread_id", thread.id)
+            .order("created_at", { ascending: true })
 
-          try {
-            const res = await gorgiasFetch(
-              `${baseUrl}/tickets/${ticket.id}/messages?limit=50&order_by=created_datetime:asc`,
-              { headers }
-            )
-            if (res.ok) {
-              const data = await res.json()
-              const msgs = (data.data || []).filter((m: any) => m.public)
-              messageCount = msgs.length
-              if (msgs.length > 0) {
-                const first = msgs[0]
-                firstMessage = (first.body_text || stripHtml(first.body_html || "")).slice(0, 500)
-                const last = msgs[msgs.length - 1]
-                lastMessage = (last.body_text || stripHtml(last.body_html || "")).slice(0, 500)
-              }
-              // Find first agent reply for response time analytics
-              const firstAgentMsg = msgs.find((m: any) => m.from_agent)
-              if (firstAgentMsg) {
-                firstReplyAt = firstAgentMsg.created_datetime
-              }
-            }
-          } catch { /* skip */ }
+          const publicMsgs = messages || []
+          const firstMsg = publicMsgs[0]
+          const lastMsg = publicMsgs[publicMsgs.length - 1]
+          const firstMessage = (firstMsg?.body_text || "").slice(0, 500)
+          const lastMessage = (lastMsg?.body_text || "").slice(0, 500)
+          const firstAgentMsg = publicMsgs.find((m) => m.from_agent)
 
-          const category = classifyTicket(ticket.subject, firstMessage)
+          const category = classifyTicket(thread.subject, firstMessage)
 
           return {
             cache: {
-              ticket_id: ticket.id,
-              subject: ticket.subject || null,
-              status: ticket.status,
-              priority: ticket.priority || "normal",
-              customer_name: ticket.customer?.name || ticket.customer?.email || "?",
-              customer_email: ticket.customer?.email || "",
-              created_at: ticket.created_datetime,
-              updated_at: ticket.updated_datetime,
-              tags: (ticket.tags || []).map((t: any) => t.name),
+              ticket_id: thread.id,
+              subject: thread.subject,
+              status: thread.status,
+              priority: "normal",
+              customer_name: thread.customer_name,
+              customer_email: thread.customer_email,
+              created_at: thread.created_at,
+              updated_at: thread.updated_at,
+              tags: [],
               first_message: firstMessage,
               last_message: lastMessage,
-              message_count: messageCount,
+              message_count: thread.message_count,
             },
             analysis: {
-              ticket_id: ticket.id,
+              ticket_id: thread.id,
               category,
-              first_reply_at: firstReplyAt,
-              ticket_created_at: ticket.created_datetime,
+              first_reply_at: firstAgentMsg?.created_at || null,
+              ticket_created_at: thread.created_at,
               analyzed_at: new Date().toISOString(),
             },
           }
         })
       )
 
-      // Upsert into ticket_cache
-      const { error } = await supabase
+      await supabase
         .from("ticket_cache")
-        .upsert(batchData.map(d => d.cache), { onConflict: "ticket_id" })
-      if (error) console.error("Sync upsert error:", error.message)
+        .upsert(batchData.map((d) => d.cache), { onConflict: "ticket_id" })
 
-      // Upsert into ticket_analysis_categories
       await supabase
         .from("ticket_analysis_categories")
-        .upsert(batchData.map(d => d.analysis), { onConflict: "ticket_id" })
+        .upsert(batchData.map((d) => d.analysis), { onConflict: "ticket_id" })
 
       synced += batchData.length
     }
 
     return NextResponse.json({
-      total: tickets.length,
+      total: threads.length,
       synced,
-      skipped: tickets.length - toSync.length,
+      skipped: threads.length - toSync.length,
+      imapSynced: syncResult.synced,
     })
   } catch (error) {
-    console.error("Gorgias sync error:", error)
+    console.error("Sync error:", error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Erreur sync" },
       { status: 500 }

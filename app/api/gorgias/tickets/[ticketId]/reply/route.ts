@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { getGorgiasConfig, gorgiasFetch, invalidateTicketsCache } from "@/lib/gorgias"
+import { createClient } from "@/lib/supabase/server"
+import { sendAndStoreReply } from "@/lib/mail"
 
 export const dynamic = "force-dynamic"
 
@@ -9,7 +10,7 @@ export async function POST(
 ) {
   try {
     const { ticketId } = await params
-    const { baseUrl, headers } = getGorgiasConfig()
+    const supabase = await createClient()
     const body = await request.json()
 
     const { bodyHtml, bodyText, customerEmail, customerName } = body as {
@@ -23,53 +24,28 @@ export async function POST(
       return NextResponse.json({ error: "bodyText ou bodyHtml requis" }, { status: 400 })
     }
 
-    // Use the actual Gorgias email integration (SendGrid verified)
-    const senderEmail = "bonjour@grainedelascars.com"
-    const integrationId = 90515
+    // Get thread subject for the reply
+    const { data: thread } = await supabase
+      .from("email_threads")
+      .select("subject")
+      .eq("id", ticketId)
+      .single()
 
-    // Baba user profile in Gorgias (agent, julesgrainedelascars@outlook.fr)
-    const babaUserId = 606027162
+    const subject = thread?.subject ? `Re: ${thread.subject}` : "Re:"
 
-    // Create the message via Gorgias — sends the email through the email integration
-    const messagePayload = {
-      channel: "email",
-      from_agent: true,
-      via: "helpdesk",
-      body_text: bodyText,
-      body_html: bodyHtml || `<p>${bodyText.replace(/\n/g, "<br>")}</p>`,
-      sender: {
-        id: babaUserId,
-      },
-      source: {
-        type: "email",
-        from: { address: senderEmail, name: "Baba" },
-        to: [{ address: customerEmail, name: customerName || customerEmail }],
-      },
-      integration_id: integrationId,
-    }
-
-    const res = await gorgiasFetch(`${baseUrl}/tickets/${ticketId}/messages`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(messagePayload),
+    const { messageId } = await sendAndStoreReply(supabase, ticketId, {
+      to: customerEmail,
+      toName: customerName,
+      subject,
+      bodyText,
+      bodyHtml: bodyHtml || `<p>${bodyText.replace(/\n/g, "<br>")}</p>`,
     })
 
-    if (!res.ok) {
-      const text = await res.text()
-      console.error("Gorgias reply error:", res.status, text)
-      return NextResponse.json(
-        { error: `Gorgias API ${res.status}: ${text}` },
-        { status: res.status }
-      )
-    }
-
-    const data = await res.json()
-    invalidateTicketsCache() // Force refresh on next fetch
-    return NextResponse.json({ success: true, message: data })
+    return NextResponse.json({ success: true, message: { id: messageId } })
   } catch (error) {
-    console.error("Gorgias reply error:", error)
+    console.error("Reply error:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erreur Gorgias" },
+      { error: error instanceof Error ? error.message : "Erreur envoi" },
       { status: 500 }
     )
   }

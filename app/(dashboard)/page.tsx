@@ -40,7 +40,7 @@ interface ShippingResponse {
 }
 
 interface GorgiasTicket {
-  id: number
+  id: number | string
   status: string
   created_datetime: string
 }
@@ -187,7 +187,7 @@ function TicketAnalysisSection() {
 
       if (error || !cached || cached.length === 0) {
         setRecap(cached?.length === 0
-          ? "Aucun ticket sur cette période. Cliquez 'Sync' pour synchroniser les tickets depuis Gorgias."
+          ? "Aucun ticket sur cette période. Cliquez 'Sync' pour synchroniser les emails."
           : "Erreur de lecture. Lancez une sync d'abord.")
         setAnalyzing(false)
         return
@@ -401,7 +401,7 @@ export default function DashboardPage() {
       const res = await fetch("/api/gorgias/tickets")
       if (!res.ok) return
       const data = await res.json()
-      const tickets: GorgiasTicket[] = data.tickets || data || []
+      const tickets: GorgiasTicket[] = data.data || data.tickets || data || []
 
       const openTickets = tickets.filter(t => t.status === "open")
       const now = new Date()
@@ -424,8 +424,8 @@ export default function DashboardPage() {
           .select("ticket_id")
           .eq("user_id", user.id)
         if (readRows) {
-          const readSet = new Set(readRows.map((r: { ticket_id: number }) => r.ticket_id))
-          unreadCount = openTickets.filter(t => !readSet.has(t.id)).length
+          const readSet = new Set(readRows.map((r: { ticket_id: string }) => String(r.ticket_id)))
+          unreadCount = openTickets.filter(t => !readSet.has(String(t.id))).length
         }
       }
 

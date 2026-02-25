@@ -1,18 +1,38 @@
-import { NextResponse } from "next/server"
-import { fetchAllTickets } from "@/lib/gorgias"
+import { NextResponse, type NextRequest } from "next/server"
+import { createClient } from "@/lib/supabase/server"
+import { syncInbox, threadToTicket } from "@/lib/mail"
 
 export const dynamic = "force-dynamic"
+export const maxDuration = 60
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Uses server-side cache (30s TTL) + in-flight deduplication
-    // Max 4 pages (200 tickets) instead of 10 to reduce API calls
-    const allTickets = await fetchAllTickets(4)
-    return NextResponse.json({ data: allTickets })
+    const supabase = await createClient()
+
+    // If ?sync=1, do IMAP sync first (triggered by Refresh button)
+    const doSync = request.nextUrl.searchParams.get("sync") === "1"
+    if (doSync) {
+      await syncInbox(supabase)
+    }
+
+    // Fetch threads from Supabase
+    const { data: threads, error } = await supabase
+      .from("email_threads")
+      .select("*")
+      .order("last_message_at", { ascending: false })
+      .limit(300)
+
+    if (error) {
+      console.error("Supabase threads error:", error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    const tickets = (threads || []).map(threadToTicket)
+    return NextResponse.json({ data: tickets })
   } catch (error) {
-    console.error("Gorgias tickets error:", error)
+    console.error("Tickets error:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erreur Gorgias" },
+      { error: error instanceof Error ? error.message : "Erreur tickets" },
       { status: 500 }
     )
   }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getGorgiasConfig, gorgiasFetch, invalidateTicketsCache } from "@/lib/gorgias"
+import { createClient } from "@/lib/supabase/server"
 
 export const dynamic = "force-dynamic"
 
@@ -9,30 +9,23 @@ export async function PUT(
 ) {
   try {
     const { ticketId } = await params
-    const { baseUrl, headers } = getGorgiasConfig()
+    const supabase = await createClient()
 
-    const res = await gorgiasFetch(`${baseUrl}/tickets/${ticketId}`, {
-      method: "PUT",
-      headers,
-      body: JSON.stringify({ status: "closed" }),
-    })
+    const { error } = await supabase
+      .from("email_threads")
+      .update({ status: "closed", updated_at: new Date().toISOString() })
+      .eq("id", ticketId)
 
-    if (!res.ok) {
-      const text = await res.text()
-      console.error("Gorgias close error:", res.status, text)
-      return NextResponse.json(
-        { error: `Gorgias API ${res.status}: ${text}` },
-        { status: res.status }
-      )
+    if (error) {
+      console.error("Close thread error:", error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    const data = await res.json()
-    invalidateTicketsCache() // Force refresh on next fetch
-    return NextResponse.json({ success: true, ticket: data })
+    return NextResponse.json({ success: true, ticket: { id: ticketId, status: "closed" } })
   } catch (error) {
-    console.error("Gorgias close error:", error)
+    console.error("Close error:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erreur Gorgias" },
+      { error: error instanceof Error ? error.message : "Erreur fermeture" },
       { status: 500 }
     )
   }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { getGorgiasConfig, gorgiasFetch } from "@/lib/gorgias"
+import { createClient } from "@/lib/supabase/server"
+import { messageToGorgiasFormat } from "@/lib/mail"
 
 export const dynamic = "force-dynamic"
 
@@ -9,27 +10,25 @@ export async function GET(
 ) {
   try {
     const { ticketId } = await params
-    const { baseUrl, headers } = getGorgiasConfig()
+    const supabase = await createClient()
 
-    const res = await gorgiasFetch(
-      `${baseUrl}/tickets/${ticketId}/messages?limit=100&order_by=created_datetime:asc`,
-      { headers }
-    )
+    const { data: messages, error } = await supabase
+      .from("email_messages")
+      .select("*")
+      .eq("thread_id", ticketId)
+      .order("created_at", { ascending: true })
 
-    if (!res.ok) {
-      const text = await res.text()
-      return NextResponse.json(
-        { error: `Gorgias API ${res.status}: ${text}` },
-        { status: res.status }
-      )
+    if (error) {
+      console.error("Messages fetch error:", error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    const data = await res.json()
-    return NextResponse.json(data)
+    const formatted = (messages || []).map(messageToGorgiasFormat)
+    return NextResponse.json({ data: formatted })
   } catch (error) {
-    console.error("Gorgias messages error:", error)
+    console.error("Messages error:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erreur Gorgias" },
+      { error: error instanceof Error ? error.message : "Erreur messages" },
       { status: 500 }
     )
   }
