@@ -678,6 +678,8 @@ export default function MessagesPage() {
       // Sync IMAP — loop batches until all imported
       let totalSynced = 0
       let allDone = false
+      const syncedRepliedIds: string[] = []
+      const syncedUnrepliedIds: string[] = []
       try {
         while (!allDone) {
           const syncRes = await fetch("/api/mail/sync")
@@ -685,10 +687,26 @@ export default function MessagesPage() {
           const syncData = await syncRes.json()
           totalSynced += syncData.synced || 0
           allDone = syncData.done
+          if (syncData.repliedThreadIds?.length) {
+            syncedRepliedIds.push(...syncData.repliedThreadIds)
+          }
+          if (syncData.unrepliedThreadIds?.length) {
+            syncedUnrepliedIds.push(...syncData.unrepliedThreadIds)
+          }
           if (syncData.synced === 0) break
         }
         if (totalSynced > 0) {
           toast.success(`${totalSynced} emails synchronisés`)
+        }
+        // Update repliedMap with auto-detected agent replies + customer unreplied
+        if (syncedRepliedIds.length > 0 || syncedUnrepliedIds.length > 0) {
+          const now = new Date().toISOString()
+          setRepliedMap(prev => {
+            const next = new Map(prev)
+            for (const tid of syncedRepliedIds) next.set(tid, now)
+            for (const tid of syncedUnrepliedIds) next.delete(tid)
+            return next
+          })
         }
       } catch { /* silent */ }
       // Fetch updated tickets

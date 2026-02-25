@@ -143,7 +143,8 @@ async function resolveThreadId(
   messageId: string,
   inReplyTo: string | null,
   references: string | null,
-  subject: string
+  subject: string,
+  customerEmail: string
 ): Promise<{ threadUuid: string | null; isNew: boolean }> {
   // 1. Check In-Reply-To
   if (inReplyTo) {
@@ -159,7 +160,7 @@ async function resolveThreadId(
   // 2. Check References (last one first)
   if (references) {
     const refs = references.split(/\s+/).filter(Boolean).reverse()
-    for (const ref of refs) {
+    for (const ref of refs.slice(0, 5)) {
       const { data } = await supabase
         .from("email_messages")
         .select("thread_id")
@@ -170,15 +171,16 @@ async function resolveThreadId(
     }
   }
 
-  // 3. Fallback: match by stripped subject + same customer within 30 days
+  // 3. Fallback: match by stripped subject + SAME customer email within 7 days
   const stripped = stripSubjectPrefixes(subject)
-  if (stripped) {
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  if (stripped && customerEmail) {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
     const { data } = await supabase
       .from("email_threads")
       .select("id")
       .eq("subject", stripped)
-      .gte("last_message_at", thirtyDaysAgo)
+      .eq("customer_email", customerEmail.toLowerCase())
+      .gte("last_message_at", sevenDaysAgo)
       .order("last_message_at", { ascending: false })
       .limit(1)
       .single()
@@ -194,7 +196,7 @@ async function resolveThreadId(
 export async function syncInbox(
   supabase: SupabaseClient,
   maxEmails: number = 200
-): Promise<{ synced: number; errors: number; done: boolean }> {
+): Promise<{ synced: number; errors: number; done: boolean; agentLastThreadIds: string[]; customerLastThreadIds: string[] }> {
   // Get last UID
   const { data: syncState } = await supabase
     .from("email_sync_state")
@@ -211,6 +213,8 @@ export async function syncInbox(
   let synced = 0
   let errors = 0
   let maxUid = lastUid
+  // Track per-thread: was the last synced message from the agent?
+  const threadLastFromAgent = new Map<string, boolean>()
 
   try {
     const lock = await client.getMailboxLock("INBOX")
@@ -285,7 +289,8 @@ export async function syncInbox(
             messageId,
             inReplyTo,
             references,
-            subject
+            subject,
+            customerEmail
           )
 
           let finalThreadUuid: string
@@ -396,6 +401,7 @@ export async function syncInbox(
 
           synced++
           if (msg.uid > maxUid) maxUid = msg.uid
+          threadLastFromAgent.set(finalThreadUuid, fromAgent)
         } catch (err) {
           console.error("Error processing message uid:", msg.uid, err)
           errors++
@@ -416,8 +422,18 @@ export async function syncInbox(
       .eq("id", "main")
   }
 
+  // Threads where agent was the last sender in this batch
+  const agentLastThreadIds = [...threadLastFromAgent.entries()]
+    .filter(([, isAgent]) => isAgent)
+    .map(([threadId]) => threadId)
+
+  // Threads where customer was the last sender (need to remove replied status)
+  const customerLastThreadIds = [...threadLastFromAgent.entries()]
+    .filter(([, isAgent]) => !isAgent)
+    .map(([threadId]) => threadId)
+
   // done = true if we processed less than maxEmails (no more to fetch)
-  return { synced, errors, done: synced < maxEmails }
+  return { synced, errors, done: synced < maxEmails, agentLastThreadIds, customerLastThreadIds }
 }
 
 // ─── SMTP Send ───

@@ -41,6 +41,17 @@ export async function POST(
       bodyHtml: bodyHtml || `<p>${bodyText.replace(/\n/g, "<br>")}</p>`,
     })
 
+    // Auto-mark as replied server-side
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      await supabase
+        .from("ticket_replied_status")
+        .upsert(
+          { user_id: user.id, ticket_id: ticketId, replied_at: new Date().toISOString() },
+          { onConflict: "user_id,ticket_id" }
+        )
+    }
+
     return NextResponse.json({ success: true, message: { id: messageId } })
   } catch (error) {
     console.error("Reply error:", error)
