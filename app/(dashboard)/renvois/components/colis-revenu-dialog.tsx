@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import {
   Dialog,
   DialogContent,
@@ -8,10 +8,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Search, PackageCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getReasonEmoji } from "@/lib/renvois"
 import type { Renvoi } from "@/lib/types"
 
 interface SearchOrderResult {
@@ -51,6 +51,18 @@ export function ColisRevenuDialog({ open, onOpenChange, renvois, onConfirmExisti
   const [submitting, setSubmitting] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Existing renvois not yet marked as revenu
+  const suggestions = useMemo(() => {
+    const candidates = renvois.filter((r) => !r.colisRevenu)
+    if (!search) return candidates
+    const q = search.toLowerCase()
+    return candidates.filter((r) =>
+      r.orderName.toLowerCase().includes(q) ||
+      r.customerName.toLowerCase().includes(q) ||
+      r.customerEmail.toLowerCase().includes(q)
+    )
+  }, [renvois, search])
+
   useEffect(() => {
     if (!open) {
       setSearch("")
@@ -58,7 +70,7 @@ export function ColisRevenuDialog({ open, onOpenChange, renvois, onConfirmExisti
     }
   }, [open])
 
-  // Search Shopify orders
+  // Search Shopify orders only when typing
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     if (search.trim().length < 2) { setSearchResults([]); return }
@@ -77,21 +89,23 @@ export function ColisRevenuDialog({ open, onOpenChange, renvois, onConfirmExisti
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [search])
 
-  async function handleSelect(order: SearchOrderResult) {
+  async function handleSelectRenvoi(renvoi: Renvoi) {
+    if (submitting) return
     setSubmitting(true)
-    // Check if this order already has a renvoi
+    onConfirmExisting(renvoi.id)
+    setSubmitting(false)
+    setSearch("")
+    onOpenChange(false)
+  }
+
+  async function handleSelectShopify(order: SearchOrderResult) {
+    if (submitting) return
+    setSubmitting(true)
     const existing = renvois.find(
       (r) => r.shopifyOrderId === order.id || r.orderName === order.name
     )
-
     if (existing) {
-      if (existing.colisRevenu) {
-        // Already marked
-        setSubmitting(false)
-        onOpenChange(false)
-        return
-      }
-      onConfirmExisting(existing.id)
+      if (!existing.colisRevenu) onConfirmExisting(existing.id)
     } else {
       onConfirmNew(order)
     }
@@ -99,6 +113,13 @@ export function ColisRevenuDialog({ open, onOpenChange, renvois, onConfirmExisti
     setSearch("")
     onOpenChange(false)
   }
+
+  // Filter out Shopify results that are already in suggestions
+  const shopifyOnly = searchResults.filter((order) => {
+    return !renvois.some((r) => r.shopifyOrderId === order.id || r.orderName === order.name)
+  })
+
+  const showShopifySection = search.length >= 2
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -108,16 +129,13 @@ export function ColisRevenuDialog({ open, onOpenChange, renvois, onConfirmExisti
             <PackageCheck className="h-5 w-5 text-emerald-600" />
             Un colis est revenu ?
           </DialogTitle>
-          <p className="text-[13px] text-muted-foreground">
-            Recherche la commande dont le colis est revenu
-          </p>
         </DialogHeader>
 
-        <div className="space-y-3 mt-2">
+        <div className="space-y-3 mt-1">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="N° commande, nom ou email..."
+              placeholder="Rechercher commande, client..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 text-[13px]"
@@ -125,56 +143,97 @@ export function ColisRevenuDialog({ open, onOpenChange, renvois, onConfirmExisti
             />
           </div>
 
-          <div className="max-h-72 overflow-y-auto space-y-1 rounded-md border border-border p-1">
-            {searching && (
-              <p className="text-[13px] text-muted-foreground text-center py-6">Recherche...</p>
-            )}
-            {!searching && search.length >= 2 && searchResults.length === 0 && (
-              <p className="text-[13px] text-muted-foreground text-center py-6">Aucune commande trouvee</p>
-            )}
-            {!searching && search.length < 2 && (
-              <p className="text-[13px] text-muted-foreground/60 text-center py-8">
-                Tape un nom, email ou numero de commande
-              </p>
-            )}
-            {searchResults.map((order) => {
-              const existingRenvoi = renvois.find(
-                (r) => r.shopifyOrderId === order.id || r.orderName === order.name
-              )
-              const alreadyRevenu = existingRenvoi?.colisRevenu
-
-              return (
-                <button
-                  key={order.id}
-                  onClick={() => !alreadyRevenu && !submitting && handleSelect(order)}
-                  disabled={alreadyRevenu || submitting}
-                  className={cn(
-                    "w-full text-left px-3 py-2.5 rounded-lg transition-colors",
-                    alreadyRevenu
-                      ? "opacity-40 cursor-not-allowed"
-                      : "hover:bg-emerald-500/5 hover:ring-1 hover:ring-emerald-500/20 cursor-pointer"
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[13px] font-medium">{order.name}</span>
-                      <span className="text-[12px] text-muted-foreground">{order.customerName}</span>
-                      {existingRenvoi && !alreadyRevenu && (
-                        <Badge variant="secondary" className="text-[9px]">Renvoi existant</Badge>
-                      )}
-                      {alreadyRevenu && (
-                        <Badge variant="secondary" className="text-[9px] bg-emerald-500/10 text-emerald-600">Deja revenu</Badge>
+          <div className="max-h-80 overflow-y-auto space-y-1 rounded-md border border-border p-1">
+            {/* Existing renvois — shown first */}
+            {suggestions.length > 0 && (
+              <>
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider px-2 pt-1.5 pb-1">
+                  Renvois en cours
+                </p>
+                {suggestions.map((r) => (
+                  <button
+                    key={r.id}
+                    onClick={() => handleSelectRenvoi(r)}
+                    disabled={submitting}
+                    className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-emerald-500/5 hover:ring-1 hover:ring-emerald-500/20 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[13px] font-medium">{r.orderName}</span>
+                        <span className="text-[12px] text-muted-foreground">{r.customerName}</span>
+                        <Badge variant="secondary" className="text-[9px]">
+                          {getReasonEmoji(r.reason)} {r.status === "a_renvoyer" ? "A renvoyer" : r.status === "expedie" ? "Expedie" : "Livre"}
+                        </Badge>
+                      </div>
+                      <span className="text-[13px] font-medium">{formatCurrency(r.orderTotal)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[11px] text-muted-foreground">{formatDate(r.renvoiDate)}</span>
+                      {r.trackingNumber && (
+                        <span className="text-[10px] font-mono text-muted-foreground/60">{r.trackingNumber}</span>
                       )}
                     </div>
-                    <span className="text-[13px] font-medium">{formatCurrency(order.totalPrice)}</span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[11px] text-muted-foreground">{formatDate(order.createdAt)}</span>
-                    <span className="text-[11px] text-muted-foreground">{order.customerEmail}</span>
-                  </div>
-                </button>
-              )
-            })}
+                  </button>
+                ))}
+              </>
+            )}
+
+            {/* Shopify search results — when typing */}
+            {showShopifySection && (
+              <>
+                {(suggestions.length > 0 || shopifyOnly.length > 0) && (
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider px-2 pt-2.5 pb-1">
+                    Autres commandes Shopify
+                  </p>
+                )}
+                {searching && (
+                  <p className="text-[13px] text-muted-foreground text-center py-4">Recherche Shopify...</p>
+                )}
+                {!searching && shopifyOnly.length === 0 && suggestions.length === 0 && (
+                  <p className="text-[13px] text-muted-foreground text-center py-4">Aucune commande trouvee</p>
+                )}
+                {!searching && shopifyOnly.map((order) => {
+                  const alreadyRevenu = renvois.find(
+                    (r) => (r.shopifyOrderId === order.id || r.orderName === order.name) && r.colisRevenu
+                  )
+                  return (
+                    <button
+                      key={order.id}
+                      onClick={() => !alreadyRevenu && handleSelectShopify(order)}
+                      disabled={!!alreadyRevenu || submitting}
+                      className={cn(
+                        "w-full text-left px-3 py-2.5 rounded-lg transition-colors",
+                        alreadyRevenu
+                          ? "opacity-40 cursor-not-allowed"
+                          : "hover:bg-secondary cursor-pointer"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[13px] font-medium">{order.name}</span>
+                          <span className="text-[12px] text-muted-foreground">{order.customerName}</span>
+                          {alreadyRevenu && (
+                            <Badge variant="secondary" className="text-[9px] bg-emerald-500/10 text-emerald-600">Deja revenu</Badge>
+                          )}
+                        </div>
+                        <span className="text-[13px] font-medium">{formatCurrency(order.totalPrice)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[11px] text-muted-foreground">{formatDate(order.createdAt)}</span>
+                        <span className="text-[11px] text-muted-foreground">{order.customerEmail}</span>
+                      </div>
+                    </button>
+                  )
+                })}
+              </>
+            )}
+
+            {/* Empty state when no search and no suggestions */}
+            {!showShopifySection && suggestions.length === 0 && (
+              <p className="text-[13px] text-muted-foreground/60 text-center py-8">
+                Aucun renvoi en cours — recherche une commande Shopify
+              </p>
+            )}
           </div>
         </div>
       </DialogContent>
