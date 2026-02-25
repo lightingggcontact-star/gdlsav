@@ -102,6 +102,15 @@ export const KanbanCard = React.memo(function KanbanCard({
         </div>
       ) : null}
 
+      {/* Colis revenu badge */}
+      {renvoi.colisRevenu && (
+        <div className="mt-2 flex items-center gap-1.5">
+          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-600">
+            Colis revenu
+          </span>
+        </div>
+      )}
+
       {/* Row 5: note preview */}
       {renvoi.note && (
         <p className="text-[11px] text-muted-foreground/80 italic mt-1.5 line-clamp-1">

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { Plus, Search } from "lucide-react"
+import { Plus, Search, PackageCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -12,6 +12,7 @@ import {
   updateRenvoiTracking,
   updateRenvoiNote,
   deleteRenvoi,
+  markColisRevenu,
   deriveRenvoiStatusFromTracking,
   REASON_OPTIONS,
 } from "@/lib/renvois"
@@ -22,6 +23,7 @@ import { KpiBar } from "./components/kpi-bar"
 import { KanbanBoard } from "./components/kanban-board"
 import { RenvoiDetailSheet } from "./components/renvoi-detail-sheet"
 import { CreateRenvoiDialog } from "./components/create-renvoi-dialog"
+import { ColisRevenuDialog } from "./components/colis-revenu-dialog"
 
 export default function RenvoisPage() {
   const supabase = useSupabase()
@@ -34,6 +36,7 @@ export default function RenvoisPage() {
 
   // Dialog / Sheet
   const [showCreate, setShowCreate] = useState(false)
+  const [showColisRevenu, setShowColisRevenu] = useState(false)
   const [selectedRenvoi, setSelectedRenvoi] = useState<Renvoi | null>(null)
 
   // La Poste tracking
@@ -201,6 +204,13 @@ export default function RenvoisPage() {
     toast.success("Renvoi supprime")
   }
 
+  async function handleColisRevenu(renvoiId: string) {
+    setRenvois((prev) => prev.map((r) => (r.id === renvoiId ? { ...r, colisRevenu: true } : r)))
+    await markColisRevenu(supabase, renvoiId, true)
+    const r = renvois.find((r) => r.id === renvoiId)
+    toast.success(`Colis revenu ${r?.orderName ?? ""} enregistre`)
+  }
+
   // ─── Loading ─────────────────────────────────────────
 
   if (loading) {
@@ -230,10 +240,16 @@ export default function RenvoisPage() {
           <h1 className="text-xl font-semibold">Renvois</h1>
           <p className="text-[13px] text-muted-foreground mt-0.5">Suivi des commandes renvoyees aux clients</p>
         </div>
-        <Button size="sm" onClick={() => setShowCreate(true)} className="gap-2 bg-[#007AFF] hover:bg-[#0066DD]">
-          <Plus className="h-4 w-4" />
-          Nouveau renvoi
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setShowColisRevenu(true)} className="gap-2">
+            <PackageCheck className="h-4 w-4" />
+            Colis revenu
+          </Button>
+          <Button size="sm" onClick={() => setShowCreate(true)} className="gap-2 bg-gdl-purple hover:bg-[#0066DD]">
+            <Plus className="h-4 w-4" />
+            Nouveau renvoi
+          </Button>
+        </div>
       </div>
 
       {/* KPIs */}
@@ -290,6 +306,14 @@ export default function RenvoisPage() {
         onTrackingChange={handleTrackingChange}
         onNoteChange={handleNoteChange}
         onDelete={handleDelete}
+      />
+
+      {/* Colis revenu Dialog */}
+      <ColisRevenuDialog
+        open={showColisRevenu}
+        onOpenChange={setShowColisRevenu}
+        renvois={renvois}
+        onConfirm={handleColisRevenu}
       />
 
       {/* Create Dialog */}

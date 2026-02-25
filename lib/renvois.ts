@@ -99,6 +99,10 @@ export async function updateRenvoiNote(
   await supabase.from("renvois").update({ note }).eq("id", id)
 }
 
+export async function markColisRevenu(supabase: SupabaseClient, id: string, revenu: boolean) {
+  await supabase.from("renvois").update({ colis_revenu: revenu }).eq("id", id)
+}
+
 export async function deleteRenvoi(supabase: SupabaseClient, id: string) {
   await supabase.from("renvois").delete().eq("id", id)
 }

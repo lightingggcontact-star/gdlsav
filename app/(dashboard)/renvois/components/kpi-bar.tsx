@@ -1,6 +1,6 @@
 "use client"
 
-import { Clock, Truck, CircleCheck, Euro } from "lucide-react"
+import { Clock, Truck, CircleCheck, Euro, PackageCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Renvoi } from "@/lib/types"
 
@@ -37,18 +37,24 @@ export function KpiBar({ renvois }: { renvois: Renvoi[] }) {
   const aRenvoyer = renvois.filter((r) => r.status === "a_renvoyer").length
   const expedies = renvois.filter((r) => r.status === "expedie").length
   const livres = renvois.filter((r) => r.status === "livre").length
+  const colisRevenus = renvois.filter((r) => r.colisRevenu).length
 
   const now = new Date()
   const thisMonth = renvois.filter((r) => {
     const d = new Date(r.renvoiDate)
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
   })
-  const coutMois = thisMonth
+
+  const coutBrut = thisMonth.reduce((sum, r) => sum + parseFloat(r.orderTotal || "0"), 0)
+  const coutRevenus = thisMonth
+    .filter((r) => r.colisRevenu)
     .reduce((sum, r) => sum + parseFloat(r.orderTotal || "0"), 0)
-    .toLocaleString("fr-FR", { style: "currency", currency: "EUR" })
+  const coutNet = coutBrut - coutRevenus
+
+  const fmtCout = (n: number) => n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
       <KpiCard
         icon={Clock}
         label="A renvoyer"
@@ -71,10 +77,18 @@ export function KpiBar({ renvois }: { renvois: Renvoi[] }) {
         iconColor="text-emerald-600"
       />
       <KpiCard
+        icon={PackageCheck}
+        label="Colis revenus"
+        value={colisRevenus}
+        subtitle={coutRevenus > 0 ? `−${fmtCout(coutRevenus)} recupere` : undefined}
+        iconBg="bg-violet-500/10"
+        iconColor="text-violet-600"
+      />
+      <KpiCard
         icon={Euro}
-        label="Cout ce mois"
-        value={coutMois}
-        subtitle={`${thisMonth.length} renvoi${thisMonth.length > 1 ? "s" : ""}`}
+        label="Cout net ce mois"
+        value={fmtCout(coutNet)}
+        subtitle={coutRevenus > 0 ? `${fmtCout(coutBrut)} − ${fmtCout(coutRevenus)}` : `${thisMonth.length} renvoi${thisMonth.length > 1 ? "s" : ""}`}
         iconBg="bg-red-500/10"
         iconColor="text-red-600"
       />
