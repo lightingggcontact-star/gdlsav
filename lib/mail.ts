@@ -192,8 +192,9 @@ async function resolveThreadId(
 // ─── IMAP Sync ───
 
 export async function syncInbox(
-  supabase: SupabaseClient
-): Promise<{ synced: number; errors: number }> {
+  supabase: SupabaseClient,
+  maxEmails: number = 200
+): Promise<{ synced: number; errors: number; done: boolean }> {
   // Get last UID
   const { data: syncState } = await supabase
     .from("email_sync_state")
@@ -215,8 +216,7 @@ export async function syncInbox(
     const lock = await client.getMailboxLock("INBOX")
 
     try {
-      // Fetch new emails (uid > lastUid)
-      // If lastUid is 0 (first sync), fetch all
+      // Always fetch from lastUid+1 (or 1:* on first sync)
       const range = lastUid === 0 ? "1:*" : `${lastUid + 1}:*`
 
       const messages = client.fetch(range, {
@@ -227,6 +227,9 @@ export async function syncInbox(
       })
 
       for await (const msg of messages) {
+        // Stop if we hit the batch limit
+        if (synced >= maxEmails) break
+
         try {
           if (msg.uid <= lastUid) continue // skip already synced
 
@@ -413,7 +416,8 @@ export async function syncInbox(
       .eq("id", "main")
   }
 
-  return { synced, errors }
+  // done = true if we processed less than maxEmails (no more to fetch)
+  return { synced, errors, done: synced < maxEmails }
 }
 
 // ─── SMTP Send ───

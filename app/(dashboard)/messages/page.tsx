@@ -304,6 +304,7 @@ export default function MessagesPage() {
   const [allTickets, setAllTickets] = useState<GorgiasTicket[]>([])
   const [ticketsLoading, setTicketsLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const syncingRef = useRef(false)
   const [showClosed, setShowClosed] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [composeOpen, setComposeOpen] = useState(false)
@@ -451,6 +452,8 @@ export default function MessagesPage() {
       })
     },
     onNewTicketDetected: (count) => {
+      // Ignore realtime events during manual sync (bulk inserts)
+      if (syncingRef.current) return
       playNotificationSound()
       toast(`${count} nouveau${count > 1 ? "x" : ""} ticket${count > 1 ? "s" : ""}`, {
         description: "Cliquez pour rafraîchir",
@@ -668,12 +671,29 @@ export default function MessagesPage() {
 
   async function handleRefresh() {
     setRefreshing(true)
+    syncingRef.current = true
     if (sidebarMode === "sms") {
       await fetchSmsConversations()
     } else {
-      // Sync IMAP then fetch
+      // Sync IMAP — loop batches until all imported
+      let totalSynced = 0
+      let allDone = false
       try {
-        const res = await fetch("/api/gorgias/tickets?sync=1")
+        while (!allDone) {
+          const syncRes = await fetch("/api/mail/sync")
+          if (!syncRes.ok) break
+          const syncData = await syncRes.json()
+          totalSynced += syncData.synced || 0
+          allDone = syncData.done
+          if (syncData.synced === 0) break
+        }
+        if (totalSynced > 0) {
+          toast.success(`${totalSynced} emails synchronisés`)
+        }
+      } catch { /* silent */ }
+      // Fetch updated tickets
+      try {
+        const res = await fetch("/api/gorgias/tickets")
         if (res.ok) {
           const data = await res.json()
           setAllTickets(data.data || [])
@@ -681,6 +701,7 @@ export default function MessagesPage() {
       } catch { /* silent */ }
       if (selectedTicketId) await fetchMessages(selectedTicketId)
     }
+    syncingRef.current = false
     setRefreshing(false)
   }
 

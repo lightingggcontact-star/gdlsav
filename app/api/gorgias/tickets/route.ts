@@ -1,21 +1,14 @@
-import { NextResponse, type NextRequest } from "next/server"
+import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { syncInbox, threadToTicket } from "@/lib/mail"
+import { threadToTicket } from "@/lib/mail"
 
 export const dynamic = "force-dynamic"
-export const maxDuration = 60
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient()
 
-    // If ?sync=1, do IMAP sync first (triggered by Refresh button)
-    const doSync = request.nextUrl.searchParams.get("sync") === "1"
-    if (doSync) {
-      await syncInbox(supabase)
-    }
-
-    // Fetch threads from Supabase
+    // Fetch threads from Supabase (sync is done via /api/mail/sync)
     const { data: threads, error } = await supabase
       .from("email_threads")
       .select("*")
