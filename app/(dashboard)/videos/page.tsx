@@ -406,44 +406,70 @@ export default function VideosPage() {
   }
 
   async function uploadSingleFile(file: File) {
-    const ts = Date.now()
-    const safeName = file.name.replace(/[^\w.-]/g, "_")
-    const videoPath = `videos/${ts}-${safeName}`
-
-    const { error: uploadErr } = await supabase.storage
-      .from("stories")
-      .upload(videoPath, file, { cacheControl: "3600", contentType: file.type })
-    if (uploadErr) throw uploadErr
-
-    const { data: urlData } = supabase.storage.from("stories").getPublicUrl(videoPath)
-    const videoUrl = urlData.publicUrl
-
-    let thumbnailUrl = ""
+    // 1. Generate thumbnail client-side
+    let thumbnailBlob: Blob | null = null
     try {
-      const thumbBlob = await generateThumbnail(file)
-      const thumbPath = `thumbnails/${ts}-thumb.jpg`
-      await supabase.storage
-        .from("stories")
-        .upload(thumbPath, thumbBlob, { cacheControl: "3600", contentType: "image/jpeg" })
-      const { data: thumbUrlData } = supabase.storage.from("stories").getPublicUrl(thumbPath)
-      thumbnailUrl = thumbUrlData.publicUrl
+      thumbnailBlob = await generateThumbnail(file)
     } catch {
       // Pas grave si thumbnail echoue
     }
 
-    const name = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ")
+    // 2. Get signed upload URLs from server (avoids RLS + Vercel size limit)
+    const urlRes = await fetch("/api/stories/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileName: file.name,
+        contentType: file.type,
+        needsThumbnail: !!thumbnailBlob,
+      }),
+    })
+    if (!urlRes.ok) {
+      const err = await urlRes.json().catch(() => ({}))
+      throw new Error(err.error || `Signed URL failed (${urlRes.status})`)
+    }
+    const { video: videoUpload, thumbnail: thumbUpload } = await urlRes.json()
 
-    await fetch("/api/stories/videos", {
+    // 3. Upload video directly to Supabase Storage via signed URL
+    const videoRes = await fetch(videoUpload.signedUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type },
+      body: file,
+    })
+    if (!videoRes.ok) throw new Error(`Video upload failed (${videoRes.status})`)
+
+    // 4. Upload thumbnail if available
+    let thumbnailUrl = ""
+    if (thumbnailBlob && thumbUpload) {
+      try {
+        const thumbRes = await fetch(thumbUpload.signedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": "image/jpeg" },
+          body: thumbnailBlob,
+        })
+        if (thumbRes.ok) thumbnailUrl = thumbUpload.publicUrl
+      } catch {
+        // Pas grave
+      }
+    }
+
+    // 5. Save metadata to database
+    const name = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ")
+    const saveRes = await fetch("/api/stories/videos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name,
         emoji: "",
-        video_url: videoUrl,
+        video_url: videoUpload.publicUrl,
         thumbnail_url: thumbnailUrl,
         products: [],
       }),
     })
+    if (!saveRes.ok) {
+      const err = await saveRes.json().catch(() => ({}))
+      throw new Error(err.error || `Save failed (${saveRes.status})`)
+    }
   }
 
   async function handleBatchUpload() {
@@ -452,17 +478,20 @@ export default function VideosPage() {
     setBatchProgress({ current: 0, total: batchFiles.length })
 
     let errors = 0
+    let lastError = ""
     for (let i = 0; i < batchFiles.length; i++) {
       setBatchProgress({ current: i + 1, total: batchFiles.length })
       try {
         await uploadSingleFile(batchFiles[i])
-      } catch {
+      } catch (err) {
         errors++
+        lastError = err instanceof Error ? err.message : String(err)
+        console.error(`Upload error for ${batchFiles[i].name}:`, err)
       }
     }
 
     setBatchUploading(false)
-    if (errors > 0) alert(`${errors} vidéo(s) n'ont pas pu être uploadée(s)`)
+    if (errors > 0) alert(`${errors} vidéo(s) n'ont pas pu être uploadée(s)\n${lastError}`)
     resetDialog()
     fetchVideos()
   }
@@ -476,27 +505,45 @@ export default function VideosPage() {
       let thumbnailUrl = editingVideo.thumbnail_url ?? ""
 
       if (editFile) {
-        const ts = Date.now()
-        const safeName = editFile.name.replace(/[^\w.-]/g, "_")
-        const videoPath = `videos/${ts}-${safeName}`
-        const { error: uploadErr } = await supabase.storage
-          .from("stories")
-          .upload(videoPath, editFile, { cacheControl: "3600", contentType: editFile.type })
-        if (uploadErr) throw uploadErr
-
-        const { data: urlData } = supabase.storage.from("stories").getPublicUrl(videoPath)
-        videoUrl = urlData.publicUrl
-
+        let thumbnailBlob: Blob | null = null
         try {
-          const thumbBlob = await generateThumbnail(editFile)
-          const thumbPath = `thumbnails/${ts}-thumb.jpg`
-          await supabase.storage
-            .from("stories")
-            .upload(thumbPath, thumbBlob, { cacheControl: "3600", contentType: "image/jpeg" })
-          const { data: thumbUrlData } = supabase.storage.from("stories").getPublicUrl(thumbPath)
-          thumbnailUrl = thumbUrlData.publicUrl
+          thumbnailBlob = await generateThumbnail(editFile)
         } catch {
           // Pas grave
+        }
+
+        // Get signed upload URLs
+        const urlRes = await fetch("/api/stories/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileName: editFile.name,
+            contentType: editFile.type,
+            needsThumbnail: !!thumbnailBlob,
+          }),
+        })
+        if (!urlRes.ok) throw new Error("Erreur obtention URL upload")
+        const { video: videoUpload, thumbnail: thumbUpload } = await urlRes.json()
+
+        // Upload video directly to Supabase Storage
+        const videoRes = await fetch(videoUpload.signedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": editFile.type },
+          body: editFile,
+        })
+        if (!videoRes.ok) throw new Error("Erreur upload vidéo")
+        videoUrl = videoUpload.publicUrl
+
+        // Upload thumbnail
+        if (thumbnailBlob && thumbUpload) {
+          try {
+            const thumbRes = await fetch(thumbUpload.signedUrl, {
+              method: "PUT",
+              headers: { "Content-Type": "image/jpeg" },
+              body: thumbnailBlob,
+            })
+            if (thumbRes.ok) thumbnailUrl = thumbUpload.publicUrl
+          } catch { /* Pas grave */ }
         }
       }
 
