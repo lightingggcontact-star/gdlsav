@@ -294,6 +294,11 @@ function generateThumbnail(videoFile: File): Promise<Blob> {
       const sx = (video.videoWidth - size) / 2
       const sy = (video.videoHeight - size) / 2
       ctx.drawImage(video, sx, sy, size, size, 0, 0, 200, 200)
+      const blobUrl = video.src
+      video.pause()
+      video.removeAttribute("src")
+      video.load()
+      URL.revokeObjectURL(blobUrl)
       canvas.toBlob(
         (blob) => {
           if (blob) resolve(blob)
@@ -302,7 +307,6 @@ function generateThumbnail(videoFile: File): Promise<Blob> {
         "image/jpeg",
         0.8
       )
-      URL.revokeObjectURL(video.src)
     }
 
     video.onerror = () => {
