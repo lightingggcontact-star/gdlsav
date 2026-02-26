@@ -146,48 +146,55 @@ async function resolveThreadId(
   subject: string,
   customerEmail: string
 ): Promise<{ threadUuid: string | null; isNew: boolean }> {
-  // 1. Check In-Reply-To
-  if (inReplyTo) {
-    const { data } = await supabase
-      .from("email_messages")
-      .select("thread_id")
-      .eq("message_id", inReplyTo)
-      .limit(1)
-      .single()
-    if (data) return { threadUuid: data.thread_id, isNew: false }
-  }
-
-  // 2. Check References (last one first)
+  // Run all lookups in PARALLEL instead of sequential
+  const lookupIds: string[] = []
+  if (inReplyTo) lookupIds.push(inReplyTo)
   if (references) {
-    const refs = references.split(/\s+/).filter(Boolean).reverse()
-    for (const ref of refs.slice(0, 5)) {
-      const { data } = await supabase
-        .from("email_messages")
-        .select("thread_id")
-        .eq("message_id", ref)
-        .limit(1)
-        .single()
-      if (data) return { threadUuid: data.thread_id, isNew: false }
+    const refs = references.split(/\s+/).filter(Boolean).reverse().slice(0, 5)
+    for (const ref of refs) {
+      if (!lookupIds.includes(ref)) lookupIds.push(ref)
     }
   }
 
-  // 3. Fallback: match by stripped subject + SAME customer email within 7 days
   const stripped = stripSubjectPrefixes(subject)
-  if (stripped && customerEmail) {
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-    const { data } = await supabase
-      .from("email_threads")
-      .select("id")
-      .eq("subject", stripped)
-      .eq("customer_email", customerEmail.toLowerCase())
-      .gte("last_message_at", sevenDaysAgo)
-      .order("last_message_at", { ascending: false })
-      .limit(1)
-      .single()
-    if (data) return { threadUuid: data.id, isNew: false }
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
+  // Single batch query: find any of these message_ids
+  const [msgLookup, subjectLookup] = await Promise.all([
+    lookupIds.length > 0
+      ? supabase
+          .from("email_messages")
+          .select("message_id, thread_id")
+          .in("message_id", lookupIds)
+          .limit(lookupIds.length)
+      : Promise.resolve({ data: null }),
+    (stripped && customerEmail)
+      ? supabase
+          .from("email_threads")
+          .select("id")
+          .eq("subject", stripped)
+          .eq("customer_email", customerEmail.toLowerCase())
+          .gte("last_message_at", sevenDaysAgo)
+          .order("last_message_at", { ascending: false })
+          .limit(1)
+          .single()
+      : Promise.resolve({ data: null }),
+  ])
+
+  // Priority: In-Reply-To > References > Subject match
+  if (msgLookup.data?.length) {
+    const byId = new Map(msgLookup.data.map((r: { message_id: string; thread_id: string }) => [r.message_id, r.thread_id]))
+    // Check in priority order
+    for (const id of lookupIds) {
+      const tid = byId.get(id)
+      if (tid) return { threadUuid: tid, isNew: false }
+    }
   }
 
-  // 4. New thread
+  if (subjectLookup.data && "id" in subjectLookup.data) {
+    return { threadUuid: (subjectLookup.data as { id: string }).id, isNew: false }
+  }
+
   return { threadUuid: null, isNew: true }
 }
 
@@ -270,19 +277,6 @@ export async function syncInbox(
               : toAddr)
             : (fromName || fromAddr)
 
-          // Check if message already exists
-          const { data: existing } = await supabase
-            .from("email_messages")
-            .select("id")
-            .eq("message_id", messageId)
-            .limit(1)
-            .single()
-
-          if (existing) {
-            if (msg.uid > maxUid) maxUid = msg.uid
-            continue // already synced
-          }
-
           // Resolve thread
           const { threadUuid, isNew } = await resolveThreadId(
             supabase,
@@ -324,10 +318,10 @@ export async function syncInbox(
             finalThreadUuid = threadUuid
           }
 
-          // Upload attachments to Supabase Storage
+          // Upload attachments to Supabase Storage (in parallel)
           const attachmentMeta: { name: string; content_type: string; size: number; url: string }[] = []
           if (parsed.attachments?.length) {
-            for (const att of parsed.attachments) {
+            const uploads = parsed.attachments.map(async (att) => {
               try {
                 const path = `${finalThreadUuid}/${messageId}/${att.filename || "attachment"}`
                 const { error: uploadErr } = await supabase.storage
@@ -340,20 +334,21 @@ export async function syncInbox(
                   const { data: urlData } = supabase.storage
                     .from("email-attachments")
                     .getPublicUrl(path)
-                  attachmentMeta.push({
+                  return {
                     name: att.filename || "attachment",
                     content_type: att.contentType || "application/octet-stream",
                     size: att.size || 0,
                     url: urlData.publicUrl,
-                  })
+                  }
                 }
-              } catch {
-                // Skip attachment upload errors
-              }
-            }
+              } catch { /* skip */ }
+              return null
+            })
+            const results = await Promise.all(uploads)
+            for (const r of results) if (r) attachmentMeta.push(r)
           }
 
-          // Insert message
+          // Insert message (skip duplicates via unique message_id)
           const { error: msgErr } = await supabase
             .from("email_messages")
             .insert({
@@ -374,29 +369,36 @@ export async function syncInbox(
             })
 
           if (msgErr) {
+            // Duplicate message_id — already synced, just skip
+            if (msgErr.code === "23505") {
+              if (msg.uid > maxUid) maxUid = msg.uid
+              continue
+            }
             console.error("Failed to insert message:", msgErr)
             errors++
             continue
           }
 
-          // Update thread stats (if existing thread)
+          // Update thread stats (if existing thread) — run in parallel
           if (!isNew && threadUuid) {
-            // Get message count
-            const { count } = await supabase
-              .from("email_messages")
-              .select("id", { count: "exact", head: true })
-              .eq("thread_id", finalThreadUuid)
-
-            await supabase
-              .from("email_threads")
-              .update({
-                last_message_at: date.toISOString(),
-                message_count: count || 1,
-                updated_at: new Date().toISOString(),
-                // Re-open thread if customer replies to a closed one
-                ...(!fromAgent ? { status: "open" } : {}),
-              })
-              .eq("id", finalThreadUuid)
+            // Fire and don't await — thread stats can update slightly after
+            ;(async () => {
+              try {
+                const { count } = await supabase
+                  .from("email_messages")
+                  .select("id", { count: "exact", head: true })
+                  .eq("thread_id", finalThreadUuid)
+                await supabase
+                  .from("email_threads")
+                  .update({
+                    last_message_at: date.toISOString(),
+                    message_count: count || 1,
+                    updated_at: new Date().toISOString(),
+                    ...(!fromAgent ? { status: "open" } : {}),
+                  })
+                  .eq("id", finalThreadUuid)
+              } catch { /* best effort */ }
+            })()
           }
 
           synced++
