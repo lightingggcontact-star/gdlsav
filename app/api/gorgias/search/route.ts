@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient()
     const pattern = `%${q}%`
 
-    // Search by customer name, email, or subject
+    // Search threads by customer name, email, or subject
     const { data: threads, error } = await supabase
       .from("email_threads")
       .select("*")
@@ -27,7 +27,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: [] })
     }
 
-    const tickets = (threads || []).map(threadToTicket)
+    const threadIds = new Set((threads || []).map(t => t.id))
+
+    // Also search in message bodies for matching threads
+    const { data: bodyMatches } = await supabase
+      .from("email_messages")
+      .select("thread_id")
+      .ilike("body_text", pattern)
+      .limit(200)
+
+    const extraThreadIds = [...new Set((bodyMatches || []).map(m => m.thread_id))]
+      .filter(id => !threadIds.has(id))
+
+    let allThreads = threads || []
+    if (extraThreadIds.length > 0) {
+      const { data: extraThreads } = await supabase
+        .from("email_threads")
+        .select("*")
+        .in("id", extraThreadIds.slice(0, 50))
+        .order("last_message_at", { ascending: false })
+      if (extraThreads) allThreads = [...allThreads, ...extraThreads]
+    }
+
+    const tickets = allThreads.map(threadToTicket)
     return NextResponse.json({ data: tickets })
   } catch (error) {
     console.error("Search error:", error)

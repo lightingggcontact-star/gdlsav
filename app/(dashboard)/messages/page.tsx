@@ -308,6 +308,8 @@ export default function MessagesPage() {
   const [allTickets, setAllTickets] = useState<GorgiasTicket[]>([])
   const [ticketsLoading, setTicketsLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null)
+  const [, setNow] = useState(0) // force re-render for relative time
   const syncingRef = useRef(false)
   const [showClosed, setShowClosed] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -673,8 +675,14 @@ export default function MessagesPage() {
 
   useEffect(() => {
     setTicketsLoading(true)
-    fetchTickets().finally(() => setTicketsLoading(false))
+    fetchTickets().finally(() => { setTicketsLoading(false); setLastSyncAt(new Date()) })
   }, [fetchTickets])
+
+  // Update relative time display every 30s
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(t)
+  }, [])
 
   async function handleRefresh() {
     setRefreshing(true)
@@ -728,6 +736,7 @@ export default function MessagesPage() {
     }
     syncingRef.current = false
     setRefreshing(false)
+    setLastSyncAt(new Date())
   }
 
   // ─── Weekly recap download (AI-powered) ───
@@ -1700,6 +1709,21 @@ export default function MessagesPage() {
             <p className="text-[12px] text-muted-foreground truncate mt-0.5">
               {ticket.subject || "Sans objet"}
             </p>
+            {ticket.status === "open" && !repliedMap.has(String(ticket.id)) && (() => {
+              const waitMs = Date.now() - new Date(lastDate).getTime()
+              const waitH = Math.floor(waitMs / 3_600_000)
+              if (waitH < 1) return null
+              const label = waitH < 24 ? `${waitH}h` : `${Math.floor(waitH / 24)}j`
+              return (
+                <span className={cn(
+                  "inline-flex items-center gap-0.5 text-[10px] font-medium mt-1 px-1.5 py-0.5 rounded-full",
+                  waitH >= 24 ? "bg-red-100 text-red-700" : waitH >= 4 ? "bg-orange-100 text-orange-700" : "bg-yellow-50 text-yellow-700"
+                )}>
+                  <Clock className="h-2.5 w-2.5" />
+                  attend depuis {label}
+                </span>
+              )
+            })()}
           </div>
         </div>
       </button>
@@ -1799,9 +1823,15 @@ export default function MessagesPage() {
                   onClick={handleRefresh}
                   disabled={refreshing}
                   className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-[#F0F0F0] transition-colors"
+                  title={lastSyncAt ? `Dernière sync : ${lastSyncAt.toLocaleTimeString("fr-FR")}` : undefined}
                 >
                   <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
                 </button>
+                {lastSyncAt && (
+                  <span className="text-[10px] text-muted-foreground/60 ml-0.5 whitespace-nowrap">
+                    {timeAgo(lastSyncAt.toISOString())}
+                  </span>
+                )}
               </div>
             </div>
 
