@@ -1214,6 +1214,11 @@ export default function MessagesPage() {
               date: new Date().toISOString(),
             },
           ],
+          customerOrders: customerOrders ? {
+            ...customerOrders,
+            orders: customerOrders.orders.map(o => ({ ...o })),
+          } : undefined,
+          joyPoints: joyPoints || undefined,
         }),
       })
       if (res.ok) {
