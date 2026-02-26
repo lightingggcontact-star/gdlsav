@@ -281,13 +281,17 @@ function countryFlag(code: string): string {
 
 // ─── Spam detection ───
 
-type SpamCategory = "chronopost" | "17track" | "bounced" | null
+type SpamCategory = "chronopost" | "17track" | "bounced" | "ecom" | null
 
-function getSpamCategory(email: string): SpamCategory {
+function getSpamCategory(email: string, subject?: string | null): SpamCategory {
   const e = email.toLowerCase()
   if (/^chronopost@network\d+\.pickup\.fr$/.test(e) || e === "enquetesatisfaction@chronopost.fr") return "chronopost"
   if (e === "no-reply@bounce.17track.net") return "17track"
   if (/^mailer-daemon@/i.test(e) || /^postmaster@/i.test(e)) return "bounced"
+  if (subject) {
+    const s = subject.toLowerCase()
+    if (s.includes("ecom") || s.includes("sales") || s.includes("shopify")) return "ecom"
+  }
   return null
 }
 
@@ -541,14 +545,16 @@ export default function MessagesPage() {
   }
 
   // Split tickets
-  const openTickets = allTickets.filter(t => t.status === "open" && !getSpamCategory(t.customer.email))
-  const chronoSpam = allTickets.filter(t => getSpamCategory(t.customer.email) === "chronopost")
-  const trackSpam = allTickets.filter(t => getSpamCategory(t.customer.email) === "17track")
-  const bouncedSpam = allTickets.filter(t => getSpamCategory(t.customer.email) === "bounced")
-  const closedTickets = allTickets.filter(t => t.status === "closed" && !getSpamCategory(t.customer.email))
+  const openTickets = allTickets.filter(t => t.status === "open" && !getSpamCategory(t.customer.email, t.subject))
+  const chronoSpam = allTickets.filter(t => getSpamCategory(t.customer.email, t.subject) === "chronopost")
+  const trackSpam = allTickets.filter(t => getSpamCategory(t.customer.email, t.subject) === "17track")
+  const bouncedSpam = allTickets.filter(t => getSpamCategory(t.customer.email, t.subject) === "bounced")
+  const ecomSpam = allTickets.filter(t => getSpamCategory(t.customer.email, t.subject) === "ecom")
+  const closedTickets = allTickets.filter(t => t.status === "closed" && !getSpamCategory(t.customer.email, t.subject))
   const [showChronoSpam, setShowChronoSpam] = useState(false)
   const [showTrackSpam, setShowTrackSpam] = useState(false)
   const [showBouncedSpam, setShowBouncedSpam] = useState(false)
+  const [showEcomSpam, setShowEcomSpam] = useState(false)
 
   // Tab title notification — show unread count
   const unreadCount = openTickets.filter(t => getTicketReadStatus(t) === "unread").length
@@ -570,6 +576,7 @@ export default function MessagesPage() {
   const filteredChronoSpam = filterBySearch(chronoSpam)
   const filteredTrackSpam = filterBySearch(trackSpam)
   const filteredBouncedSpam = filterBySearch(bouncedSpam)
+  const filteredEcomSpam = filterBySearch(ecomSpam)
   const filteredClosed = filterBySearch(closedTickets)
 
   // Label-based tab filtering
@@ -612,7 +619,7 @@ export default function MessagesPage() {
   const groupedClosed = groupByCustomer(filteredClosed)
 
   // Unified search results (local + deep search merged, deduped)
-  const allLocalMatches = q ? [...filteredOpen, ...filteredClosed, ...filteredChronoSpam, ...filteredTrackSpam, ...filteredBouncedSpam] : []
+  const allLocalMatches = q ? [...filteredOpen, ...filteredClosed, ...filteredChronoSpam, ...filteredTrackSpam, ...filteredBouncedSpam, ...filteredEcomSpam] : []
   const localMatchIds = new Set(allLocalMatches.map(t => t.id))
   const deepOnly = deepSearchResults.filter(t => !localMatchIds.has(t.id))
   const allSearchMatches = [...allLocalMatches, ...deepOnly]
@@ -2028,7 +2035,7 @@ export default function MessagesPage() {
                   </div>
                 )}
               </>
-            ) : filteredOpen.length === 0 && filteredClosed.length === 0 && filteredChronoSpam.length === 0 && filteredTrackSpam.length === 0 && filteredBouncedSpam.length === 0 ? (
+            ) : filteredOpen.length === 0 && filteredClosed.length === 0 && filteredChronoSpam.length === 0 && filteredTrackSpam.length === 0 && filteredBouncedSpam.length === 0 && filteredEcomSpam.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <div className="w-12 h-12 rounded-full bg-[#F0F0F0] flex items-center justify-center mb-3">
                   <Mail className="h-5 w-5 text-muted-foreground" />
@@ -2082,6 +2089,14 @@ export default function MessagesPage() {
                   color="#FFF0F0"
                   textColor="#991B1B"
                   icon={Mail}
+                />
+
+                <SpamSection
+                  label="ECOM / Sales / Shopify - Spam"
+                  tickets={filteredEcomSpam}
+                  open={showEcomSpam}
+                  onToggle={() => setShowEcomSpam(v => !v)}
+                  color="#F0FFF4"
                 />
 
                 {filteredClosed.length > 0 && (
