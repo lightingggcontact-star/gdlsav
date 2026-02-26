@@ -4,6 +4,7 @@ import { syncInbox } from "@/lib/mail"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 10
+export const preferredRegion = "cdg1" // Paris — proche de Zoho EU
 
 const BATCH_SIZE = 20
 const TIME_LIMIT_MS = 8_000 // stop at 8s to leave margin before 10s timeout (Vercel Hobby)

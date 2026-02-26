@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { sendAndStoreReply } from "@/lib/mail"
 
 export const dynamic = "force-dynamic"
+export const preferredRegion = "cdg1" // Paris — proche de Zoho EU
 
 export async function POST(
   request: NextRequest,
