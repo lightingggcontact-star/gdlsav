@@ -1,10 +1,21 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createClient as createAdminClient } from "@supabase/supabase-js"
 
 export const dynamic = "force-dynamic"
 
-// Generate signed upload URLs for client-side direct upload to Supabase Storage
-// This avoids both RLS issues and Vercel body size limits
+function getStorageClient() {
+  // Use service role key if available (bypasses RLS)
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (serviceKey) {
+    return createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      serviceKey
+    )
+  }
+  return null
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { fileName, contentType, needsThumbnail } = await request.json()
@@ -13,18 +24,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "fileName requis" }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    // Prefer admin client (service role) for storage — bypasses RLS
+    // Fall back to user client if service role not configured
+    const adminClient = getStorageClient()
+    const userClient = await createClient()
+    const storageClient = adminClient || userClient
+
     const ts = Date.now()
     const safeName = fileName.replace(/[^\w.-]/g, "_")
     const videoPath = `videos/${ts}-${safeName}`
 
     // Create signed upload URL for video
-    const { data: videoUpload, error: videoErr } = await supabase.storage
+    const { data: videoUpload, error: videoErr } = await storageClient.storage
       .from("stories")
       .createSignedUploadUrl(videoPath)
 
     if (videoErr) {
       console.error("Signed URL error:", videoErr)
+
+      // If RLS blocks, return helpful message
+      if (videoErr.message?.includes("security") || videoErr.message?.includes("policy") || videoErr.message?.includes("row-level")) {
+        return NextResponse.json({
+          error: "Storage RLS bloque l'upload. Ajoute SUPABASE_SERVICE_ROLE_KEY dans les env vars ou configure les policies du bucket 'stories'.",
+        }, { status: 500 })
+      }
+
       return NextResponse.json({ error: videoErr.message }, { status: 500 })
     }
 
@@ -32,7 +56,7 @@ export async function POST(request: NextRequest) {
     let thumbnailUpload = null
     const thumbPath = `thumbnails/${ts}-thumb.jpg`
     if (needsThumbnail) {
-      const { data: thumbData, error: thumbErr } = await supabase.storage
+      const { data: thumbData, error: thumbErr } = await storageClient.storage
         .from("stories")
         .createSignedUploadUrl(thumbPath)
       if (!thumbErr && thumbData) {
@@ -45,8 +69,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Get public URLs
-    const { data: videoPublic } = supabase.storage.from("stories").getPublicUrl(videoPath)
-    const { data: thumbPublic } = supabase.storage.from("stories").getPublicUrl(thumbPath)
+    const { data: videoPublic } = storageClient.storage.from("stories").getPublicUrl(videoPath)
+    const { data: thumbPublic } = storageClient.storage.from("stories").getPublicUrl(thumbPath)
 
     return NextResponse.json({
       video: {
