@@ -3,10 +3,10 @@ import { createClient } from "@/lib/supabase/server"
 import { syncInbox } from "@/lib/mail"
 
 export const dynamic = "force-dynamic"
-export const maxDuration = 60
+export const maxDuration = 10
 
-const BATCH_SIZE = 150
-const TIME_LIMIT_MS = 50_000 // stop at 50s to leave margin before 60s timeout
+const BATCH_SIZE = 20
+const TIME_LIMIT_MS = 8_000 // stop at 8s to leave margin before 10s timeout (Vercel Hobby)
 
 export async function GET() {
   try {
