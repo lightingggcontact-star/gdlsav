@@ -270,16 +270,22 @@ function ProductSearchInput({
 
 function generateThumbnail(videoFile: File): Promise<Blob> {
   return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Thumbnail timeout"))
+    }, 8000)
+
     const video = document.createElement("video")
     video.preload = "metadata"
     video.muted = true
     video.playsInline = true
 
     video.onloadeddata = () => {
-      video.currentTime = 1
+      // Seek to 0.5s instead of 1s — safer for short videos
+      video.currentTime = Math.min(0.5, video.duration || 0.5)
     }
 
     video.onseeked = () => {
+      clearTimeout(timeout)
       const canvas = document.createElement("canvas")
       canvas.width = 200
       canvas.height = 200
@@ -299,7 +305,10 @@ function generateThumbnail(videoFile: File): Promise<Blob> {
       URL.revokeObjectURL(video.src)
     }
 
-    video.onerror = () => reject(new Error("Erreur chargement video"))
+    video.onerror = () => {
+      clearTimeout(timeout)
+      reject(new Error("Erreur chargement video"))
+    }
     video.src = URL.createObjectURL(videoFile)
   })
 }
@@ -391,12 +400,24 @@ export default function VideosPage() {
 
   function handleFilesSelect(files: FileList | File[]) {
     const valid: File[] = []
+    const videoExts = /\.(mp4|mov|webm|avi|mkv|m4v|3gp|ogv)$/i
+    let rejected = ""
     for (const file of Array.from(files)) {
-      if (!file.type.startsWith("video/")) continue
-      if (file.size > 50 * 1024 * 1024) continue
+      const isVideo = file.type.startsWith("video/") || videoExts.test(file.name)
+      if (!isVideo) {
+        rejected = `"${file.name}" n'est pas un fichier vidéo`
+        continue
+      }
+      if (file.size > 50 * 1024 * 1024) {
+        rejected = `"${file.name}" dépasse 50 MB (${(file.size / (1024 * 1024)).toFixed(0)} MB)`
+        continue
+      }
       valid.push(file)
     }
-    if (valid.length === 0) return
+    if (valid.length === 0) {
+      if (rejected) alert(rejected)
+      return
+    }
     setBatchFiles((prev) => [...prev, ...valid])
     if (!dialogOpen) setDialogOpen(true)
   }
