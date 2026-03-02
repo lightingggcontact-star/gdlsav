@@ -202,8 +202,10 @@ async function resolveThreadId(
 
 export async function syncInbox(
   supabase: SupabaseClient,
-  maxEmails: number = 200
+  maxEmails: number = 200,
+  timeLimitMs: number = 0
 ): Promise<{ synced: number; errors: number; done: boolean; agentLastThreadIds: string[]; customerLastThreadIds: string[] }> {
+  const startTime = timeLimitMs > 0 ? Date.now() : 0
   // Get last UID
   const { data: syncState } = await supabase
     .from("email_sync_state")
@@ -238,8 +240,9 @@ export async function syncInbox(
       })
 
       for await (const msg of messages) {
-        // Stop if we hit the batch limit
+        // Stop if we hit the batch limit or time limit
         if (synced >= maxEmails) break
+        if (timeLimitMs > 0 && Date.now() - startTime > timeLimitMs) break
 
         try {
           if (msg.uid <= lastUid) continue // skip already synced
