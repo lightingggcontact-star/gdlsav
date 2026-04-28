@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "migrate:imagekit": "node --env-file=.env.local scripts/migrate-supabase-to-imagekit.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",
