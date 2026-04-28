@@ -1,5 +1,5 @@
 /**
- * GDL Video Stories — Snippet Shopify
+ * GDL Video Stories — Snippet Shopifyy
  *
  * A coller dans une section Custom Liquid sur la page produit.
  * Remplacer API_BASE par l'URL de l'app.
