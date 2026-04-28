@@ -1,3 +1,7 @@
+// DEPRECATED — replaced by /api/stories/imagekit-auth + client-side ImageKit
+// upload (imagekit-javascript SDK). Safe to remove after Vercel deploy is
+// validated and no client still calls this endpoint.
+
 import { NextResponse, type NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"

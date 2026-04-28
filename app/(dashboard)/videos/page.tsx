@@ -16,8 +16,25 @@ import {
   ChevronDown,
   Check,
 } from "lucide-react"
+import ImageKit from "imagekit-javascript"
 import { useSupabase } from "@/lib/supabase/use-supabase"
 import type { StoryVideo } from "@/lib/types"
+
+// ImageKit client SDK — public key + URL endpoint are embedded at build time.
+const ikClient = new ImageKit({
+  publicKey: process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY!,
+  urlEndpoint: process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT!,
+})
+
+async function fetchImageKitAuth(): Promise<{
+  token: string
+  expire: number
+  signature: string
+}> {
+  const res = await fetch("/api/stories/imagekit-auth")
+  if (!res.ok) throw new Error(`ImageKit auth failed (${res.status})`)
+  return res.json()
+}
 
 interface ProductTag {
   id: string
@@ -439,46 +456,36 @@ export default function VideosPage() {
       // Pas grave si thumbnail echoue
     }
 
-    // 2. Get signed upload URLs from server (avoids RLS + Vercel size limit)
-    const urlRes = await fetch("/api/stories/upload", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fileName: file.name,
-        contentType: file.type,
-        needsThumbnail: !!thumbnailBlob,
-      }),
+    // 2. Upload video to ImageKit (signed by /api/stories/imagekit-auth)
+    const videoAuth = await fetchImageKitAuth()
+    const videoUpload = await ikClient.upload({
+      file,
+      fileName: file.name,
+      folder: "/stories/videos/",
+      ...videoAuth,
     })
-    if (!urlRes.ok) {
-      const err = await urlRes.json().catch(() => ({}))
-      throw new Error(err.error || `Signed URL failed (${urlRes.status})`)
-    }
-    const { video: videoUpload, thumbnail: thumbUpload } = await urlRes.json()
 
-    // 3. Upload video directly to Supabase Storage via signed URL
-    const videoRes = await fetch(videoUpload.signedUrl, {
-      method: "PUT",
-      headers: { "Content-Type": file.type },
-      body: file,
-    })
-    if (!videoRes.ok) throw new Error(`Video upload failed (${videoRes.status})`)
-
-    // 4. Upload thumbnail if available
+    // 3. Upload thumbnail if available (best-effort)
     let thumbnailUrl = ""
-    if (thumbnailBlob && thumbUpload) {
+    let thumbnailFileId = ""
+    if (thumbnailBlob) {
       try {
-        const thumbRes = await fetch(thumbUpload.signedUrl, {
-          method: "PUT",
-          headers: { "Content-Type": "image/jpeg" },
-          body: thumbnailBlob,
+        const thumbAuth = await fetchImageKitAuth()
+        const thumbName = file.name.replace(/\.[^.]+$/, "") + "-thumb.jpg"
+        const thumbUpload = await ikClient.upload({
+          file: thumbnailBlob as Blob,
+          fileName: thumbName,
+          folder: "/stories/thumbnails/",
+          ...thumbAuth,
         })
-        if (thumbRes.ok) thumbnailUrl = thumbUpload.publicUrl
+        thumbnailUrl = thumbUpload.url
+        thumbnailFileId = thumbUpload.fileId
       } catch {
         // Pas grave
       }
     }
 
-    // 5. Save metadata to database
+    // 4. Save metadata to database
     const name = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ")
     const saveRes = await fetch("/api/stories/videos", {
       method: "POST",
@@ -486,8 +493,10 @@ export default function VideosPage() {
       body: JSON.stringify({
         name,
         emoji: "",
-        video_url: videoUpload.publicUrl,
+        video_url: videoUpload.url,
         thumbnail_url: thumbnailUrl,
+        imagekit_file_id: videoUpload.fileId,
+        imagekit_thumbnail_file_id: thumbnailFileId || null,
         products: [],
       }),
     })
@@ -528,6 +537,8 @@ export default function VideosPage() {
     try {
       let videoUrl = editingVideo.video_url
       let thumbnailUrl = editingVideo.thumbnail_url ?? ""
+      let imagekitFileId: string | null = editingVideo.imagekit_file_id
+      let imagekitThumbnailFileId: string | null = editingVideo.imagekit_thumbnail_file_id
 
       if (editFile) {
         let thumbnailBlob: Blob | null = null
@@ -537,38 +548,33 @@ export default function VideosPage() {
           // Pas grave
         }
 
-        // Get signed upload URLs
-        const urlRes = await fetch("/api/stories/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fileName: editFile.name,
-            contentType: editFile.type,
-            needsThumbnail: !!thumbnailBlob,
-          }),
+        // Upload video to ImageKit
+        const videoAuth = await fetchImageKitAuth()
+        const videoUpload = await ikClient.upload({
+          file: editFile,
+          fileName: editFile.name,
+          folder: "/stories/videos/",
+          ...videoAuth,
         })
-        if (!urlRes.ok) throw new Error("Erreur obtention URL upload")
-        const { video: videoUpload, thumbnail: thumbUpload } = await urlRes.json()
-
-        // Upload video directly to Supabase Storage
-        const videoRes = await fetch(videoUpload.signedUrl, {
-          method: "PUT",
-          headers: { "Content-Type": editFile.type },
-          body: editFile,
-        })
-        if (!videoRes.ok) throw new Error("Erreur upload vidéo")
-        videoUrl = videoUpload.publicUrl
+        videoUrl = videoUpload.url
+        imagekitFileId = videoUpload.fileId
 
         // Upload thumbnail
-        if (thumbnailBlob && thumbUpload) {
+        if (thumbnailBlob) {
           try {
-            const thumbRes = await fetch(thumbUpload.signedUrl, {
-              method: "PUT",
-              headers: { "Content-Type": "image/jpeg" },
-              body: thumbnailBlob,
+            const thumbAuth = await fetchImageKitAuth()
+            const thumbName = editFile.name.replace(/\.[^.]+$/, "") + "-thumb.jpg"
+            const thumbUpload = await ikClient.upload({
+              file: thumbnailBlob as Blob,
+              fileName: thumbName,
+              folder: "/stories/thumbnails/",
+              ...thumbAuth,
             })
-            if (thumbRes.ok) thumbnailUrl = thumbUpload.publicUrl
-          } catch { /* Pas grave */ }
+            thumbnailUrl = thumbUpload.url
+            imagekitThumbnailFileId = thumbUpload.fileId
+          } catch {
+            /* Pas grave — on garde l'ancien thumbnail */
+          }
         }
       }
 
@@ -580,6 +586,8 @@ export default function VideosPage() {
           emoji: "",
           video_url: videoUrl,
           thumbnail_url: thumbnailUrl,
+          imagekit_file_id: imagekitFileId,
+          imagekit_thumbnail_file_id: imagekitThumbnailFileId,
           products: uploadProducts.map((p) => ({ id: p.id, title: p.title })),
         }),
       })
