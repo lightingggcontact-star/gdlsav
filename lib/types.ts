@@ -198,6 +198,8 @@ export interface StoryVideo {
   emoji: string
   video_url: string
   thumbnail_url: string | null
+  imagekit_file_id: string | null
+  imagekit_thumbnail_file_id: string | null
   display_order: number
   created_at: string
   stories_video_products: StoryVideoProduct[]
