@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { imagekit } from "@/lib/imagekit"
 
 export const dynamic = "force-dynamic"
 
@@ -15,7 +16,11 @@ export async function PUT(
     const updates: Record<string, unknown> = {}
     if (body.name !== undefined) updates.name = body.name
     if (body.emoji !== undefined) updates.emoji = body.emoji
+    if (body.video_url !== undefined) updates.video_url = body.video_url
     if (body.thumbnail_url !== undefined) updates.thumbnail_url = body.thumbnail_url
+    if (body.imagekit_file_id !== undefined) updates.imagekit_file_id = body.imagekit_file_id
+    if (body.imagekit_thumbnail_file_id !== undefined)
+      updates.imagekit_thumbnail_file_id = body.imagekit_thumbnail_file_id
     if (body.display_order !== undefined) updates.display_order = body.display_order
 
     if (Object.keys(updates).length > 0) {
@@ -62,10 +67,10 @@ export async function DELETE(
     const { videoId } = await params
     const supabase = await createClient()
 
-    // Recuperer les URLs pour supprimer les fichiers storage
+    // Recuperer les URLs/fileIds pour supprimer les fichiers
     const { data: video } = await supabase
       .from("stories_videos")
-      .select("video_url, thumbnail_url")
+      .select("video_url, thumbnail_url, imagekit_file_id, imagekit_thumbnail_file_id")
       .eq("id", videoId)
       .single()
 
@@ -77,12 +82,26 @@ export async function DELETE(
 
     if (error) throw error
 
-    // Supprimer les fichiers du storage
-    if (video?.video_url) {
+    // Supprimer les fichiers : ImageKit en priorité (fileId direct, pas de regex sur URL).
+    // Fallback Supabase Storage uniquement si la row n'a jamais été migrée (cas legacy).
+    if (video?.imagekit_file_id) {
+      try {
+        await imagekit.deleteFile(video.imagekit_file_id)
+      } catch (err) {
+        console.error("ImageKit deleteFile (video) failed:", err)
+      }
+    } else if (video?.video_url) {
       const path = extractStoragePath(video.video_url)
       if (path) await supabase.storage.from("stories").remove([path])
     }
-    if (video?.thumbnail_url) {
+
+    if (video?.imagekit_thumbnail_file_id) {
+      try {
+        await imagekit.deleteFile(video.imagekit_thumbnail_file_id)
+      } catch (err) {
+        console.error("ImageKit deleteFile (thumbnail) failed:", err)
+      }
+    } else if (video?.thumbnail_url) {
       const path = extractStoragePath(video.thumbnail_url)
       if (path) await supabase.storage.from("stories").remove([path])
     }

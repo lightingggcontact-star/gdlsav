@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "migrate:imagekit": "node --env-file=.env.local scripts/migrate-supabase-to-imagekit.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",
@@ -19,6 +20,8 @@
     "date-fns": "^4.1.0",
     "framer-motion": "^12.34.3",
     "googleapis": "^171.4.0",
+    "imagekit": "^6.0.0",
+    "imagekit-javascript": "^4.0.1",
     "imapflow": "^1.2.10",
     "lucide-react": "^0.563.0",
     "mailparser": "^3.9.3",
@@ -31,6 +34,7 @@
     "react-dom": "19.2.3",
     "recharts": "^3.7.0",
     "resend": "^6.9.2",
+    "server-only": "^0.0.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0"
   },

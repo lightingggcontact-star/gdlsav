@@ -34,7 +34,15 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
     const body = await request.json()
 
-    const { name, emoji, video_url, thumbnail_url, products } = body
+    const {
+      name,
+      emoji,
+      video_url,
+      thumbnail_url,
+      imagekit_file_id,
+      imagekit_thumbnail_file_id,
+      products,
+    } = body
 
     if (!name || !video_url) {
       return NextResponse.json({ error: "name et video_url requis" }, { status: 400 })
@@ -57,6 +65,8 @@ export async function POST(request: NextRequest) {
         emoji: emoji || "🎬",
         video_url,
         thumbnail_url: thumbnail_url || null,
+        imagekit_file_id: imagekit_file_id || null,
+        imagekit_thumbnail_file_id: imagekit_thumbnail_file_id || null,
         display_order: nextOrder,
       })
       .select()
